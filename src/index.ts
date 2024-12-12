@@ -6,7 +6,6 @@ import { gql } from 'graphql-request';
 
 console.log(`Using SensCritique account: ${process.env.SC_EMAIL}`);
 
-// Define the Product type
 type UserInfos = {
   isWished: boolean;
   isDone?: boolean;
@@ -29,7 +28,7 @@ type Product = {
   userInfos?: UserInfos;
 };
 
-async function getSensCritiqueWishlist() {
+async function getSensCritiqueWishlist(): Promise<void> {
   const client = await SensCritiqueGqlClient.build(process.env.SC_EMAIL!, process.env.SC_PASSWORD!);
 
   const query = gql`
@@ -57,15 +56,32 @@ async function getSensCritiqueWishlist() {
     }
   `;
 
-  // Fetch data from the API and cast it as an array of Product
-  const data: { myWishes: Product[] } = await client.request(query);
+  try {
+    const data: { myWishes: Product[] } = await client.request(query);
 
-  // Log the full response for debugging
-  console.log("Full API Response from SensCritique:", JSON.stringify(data, null, 2));
+    const currentTime = new Date().toLocaleString();
+    const simplifiedResponse = data.myWishes.map((product) => ({
+      title: product.title,
+      original_title: product.original_title,
+      release_date: product.release_date,
+    }));
+    console.log(`[${currentTime}] Simplified API Response:`, simplifiedResponse);
 
-  // Filter and analyze the data as needed
-  const activeWishes = data.myWishes.filter((product) => product.userInfos?.isWished);
-  console.log("Active Wishlist from SensCritique:", activeWishes);
+    const activeWishes = data.myWishes.filter((product) => product.userInfos?.isWished);
+    console.log(`[${currentTime}] Active Wishlist from SensCritique:`, activeWishes);
+
+    if (activeWishes.length === 0) {
+      console.log(`[${currentTime}] No active wishes found. Retrying in 30 seconds...`);
+      setTimeout(() => getSensCritiqueWishlist(), 30000);
+    } else {
+      console.log(`[${currentTime}] Active wishes found. Stopping retries.`);
+    }
+  } catch (error) {
+    const currentTime = new Date().toLocaleString();
+    console.error(`[${currentTime}] Error fetching wishlist:`, error);
+    console.log(`[${currentTime}] Retrying in 30 seconds...`);
+    setTimeout(() => getSensCritiqueWishlist(), 30000);
+  }
 }
 
 getSensCritiqueWishlist();

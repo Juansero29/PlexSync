@@ -10,16 +10,22 @@ First aim will be to provide synchronization with SensCritique, communicating wi
 
 This is a side project and in active development so not currently working.
 
+## Glosary
+
+- SC: [SensCritique](https://www.senscritique.com/)
+
 ## Current Challenges
+
+1. SensCritique seems to cache info, which makes that recently added items into the Wishes are not returned by the API calls. This may need sometime to refresh and get returned by the API. I have added an item at 18h30 - 12/12/2024, and it's not returned. I've made it so the function executes every 30 seconds until something is retrieved. We'll see at what time it will return something.
 
 ## Goals
 
 In order of priority
 
+1. Create a function that allows to add a new movie/series into SC's wishlist
+1. Create a function that allows to add a new movie/series into Plex's watchlist
 1. Create a function that retrieves a movie/series inside Plex when searched by its title and release date, with its rating
 1. Create a function that retrieves a movie/series inside SC when searched by its title and release date, with its rating
-1. Create a function that allows to add a new movie/series into Plex's watchlist
-1. Create a function that allows to add a new movie/series into SC's wishlist
 1. Create a function that allows to send all of the movies/series in Plex's watchlist into SC wishlist
 1. Create a function that allows to send all of the movies/series in SC's wishlist into Plex
 1. Create a function that synchronizes the wishes/watchlist between Plex and SC
