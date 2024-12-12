@@ -21,4 +21,4 @@ RUN mv dist/index.js dist/index.mjs
 EXPOSE 3000
 
 # Étape 8 : Définir la commande par défaut pour démarrer l'application
-CMD ["node", "--experimental-specifier-resolution=node", "dist/index.mjs"]
+CMD ["node",  "dist/index.mjs"]
