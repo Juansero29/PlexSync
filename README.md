@@ -16,7 +16,11 @@ This is a side project and in active development so not currently working.
 
 ## Current Challenges
 
-1. SensCritique seems to cache info, which makes that recently added items into the Wishes are not returned by the API calls. This may need sometime to refresh and get returned by the API. I have added an item at 18h30 - 12/12/2024, and it's not returned. I've made it so the function executes every 30 seconds until something is retrieved. We'll see at what time it will return something.
+1. SensCritique seems to either cache info or have some latency in their GraphQL
+   1. So recently added items into the Wishes are not returned by the API calls. This may need sometime to refresh and get returned by the API. I have added an item at 18h45 - 12/12/2024, and it's not returned immediately.
+   1. I've made it so the function executes every 30 seconds until something is retrieved, I'll leave my PC on with the script running. We'll see at what time it will return something. Let's hope they don't ban me or detect me as a bot lol
+   1. If new items in Wishes are never returned, then something is wrong with either my query or GraphSQL for SensCritique module => more tests to be done :/
+   1. It's now 18h49 and nothing is returned yet.
 
 ## Goals
 
