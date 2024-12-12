@@ -12,53 +12,12 @@ This is a side project and in active development so not currently working.
 
 ## Current Challenges
 
-As of now I'm focusing on extracting my own "Wishlist" from SensCritique via GraphQL, which is now partially working, since it succesfully authenticates with SensCritique and returns a list of movies that I have interacted with in the past, but that are not actually in my "Wishlist"
-
-I'm trying to understand what "myWishes" query returns from the GraphQL API of SensCritique, which is not very clear to me as of now.
-
-```ts
-async function getSensCritiqueWishlist() {
-
-    const client = await SensCritiqueGqlClient.build(process.env.SC_EMAIL!, process.env.SC_PASSWORD!, {
-    headers: {
-        'Cache-Control': 'no-cache',
-    },
-    });
-
-  const query = gql`
-    query {
-      myWishes {
-        id
-        title
-        year_of_production
-      }
-    }
-  `;
-
-  const data = await client.request(query);
-  console.log("Wishlist from SensCritique:", data.myWishes);
-}
-```
-
-Current output:
-
-```pwsh
-Using SensCritique account: juansero29@gmail.com
-Wishlist from SensCritique: [s\PlexSync>
-  { id: 40631247, title: 'Severance', year_of_production: 2022 },
-  { id: 7937926, title: 'Utopia', year_of_production: 2013 },
-  { id: 43263904, title: 'The White Lotus', year_of_production: 2021 },
-  { id: 42234, title: 'The Office (US)', year_of_production: 2005 },
-  { id: 374603, title: 'Les Soprano', year_of_production: 1999 }
-]
-```
-
 ## Goals
 
-There are the goals in order of priority
+In order of priority
 
-1. Create a function that retrieves a movie/series inside Plex when searched by its title and release date
-1. Create a function that retrieves a movie/series inside SC when searched by its title and release date
+1. Create a function that retrieves a movie/series inside Plex when searched by its title and release date, with its rating
+1. Create a function that retrieves a movie/series inside SC when searched by its title and release date, with its rating
 1. Create a function that allows to add a new movie/series into Plex's watchlist
 1. Create a function that allows to add a new movie/series into SC's wishlist
 1. Create a function that allows to send all of the movies/series in Plex's watchlist into SC wishlist
@@ -67,6 +26,15 @@ There are the goals in order of priority
    1. It should check that an item is not already in the list
    1. It should check that the two lists are identical at the end
       1. If lists are not identical, output the items that are missing and where they are missing
+1. Create a function that gets every film/series with a rating in Plex
+1. Create a function that gets every film/series with a rating in SC
+1. Create a function that puts all Plex ratings into SC
+1. Create a function that puts all SensCritique ratings into Plex
+1. Create a function that merges all ratings
+   1. It gets all ratings from Plex and the rating date (or last watched date if not available)
+   1. It gets all ratings from SC and the date of rating (or last watched date if not available)
+   1. Gets a list of films that are rated in both Plex and SC
+   1. For each film in the list, it puts the latest rating in both platforms
 
 ## Contribute
 
@@ -81,14 +49,15 @@ If you want to contribute:
 1. Clone the repo
 1. Create a file at the root of the repo named '.env' which has the following content
 
-    ```raw
-    SC_EMAIL=senscritiquemail@yourmail.com
-    SC_PASSWORD=yoursenscritiquepassword
-    PLEX_IP=your_plex_server_ip
-    PLEX_TOKEN=your_plex_api_token
-    ```
+   ```raw
+   SC_EMAIL=senscritiquemail@yourmail.com
+   SC_PASSWORD=yoursenscritiquepassword
+   PLEX_IP=your_plex_server_ip
+   PLEX_TOKEN=your_plex_api_token
+   ```
 
-    This file is ignored since it's included .gitignore, be sure to not commit it to keep your Plex and SensCritique account safe
+   This file is ignored since it's included .gitignore, be sure to not commit it to keep your Plex and SensCritique account safe
+
 1. Now you can compile and deploy the project as described bellow
 
 ## Compiling & Deploying
@@ -113,3 +82,58 @@ Commands to compile the project
 1. `docker system prune -f`
 1. `docker build -t plexsync .`
 1. `docker run --env-file .env -p 3000:3000 plexsync`
+
+## Overcome Challenges
+
+### Wishlist not retrieving correctly
+
+~~As of now I'm focusing on extracting my own "Wishlist" from SensCritique via GraphQL, which is now partially working, since it succesfully authenticates with SensCritique and returns a list of movies that I have interacted with in the past, but that are not actually in my "Wishlist"~~
+
+~~I'm trying to understand what "myWishes" query returns from the GraphQL API of SensCritique, which is not very clear to me as of now.~~
+
+<details>
+  <summary><del>Code</del></summary>
+
+Old code causing trouble
+```ts
+    async function getSensCritiqueWishlist() {
+
+        const client = await SensCritiqueGqlClient.build(process.env.SC_EMAIL!, process.env.SC_PASSWORD!, {
+        headers: {
+            'Cache-Control': 'no-cache',
+        },
+        });
+
+    const query = gql`
+        query {
+        myWishes {
+            id
+            title
+            year_of_production
+        }
+        }
+    `;
+
+    const data = await client.request(query);
+    console.log("Wishlist from SensCritique:", data.myWishes);
+
+    }
+
+````
+
+Current output:
+
+```pwsh
+Using SensCritique account: juansero29@gmail.com
+Wishlist from SensCritique: [s\PlexSync>
+  { id: 40631247, title: 'Severance', year_of_production: 2022 },
+  { id: 7937926, title: 'Utopia', year_of_production: 2013 },
+  { id: 43263904, title: 'The White Lotus', year_of_production: 2021 },
+  { id: 42234, title: 'The Office (US)', year_of_production: 2005 },
+  { id: 374603, title: 'Les Soprano', year_of_production: 1999 }
+]
+````
+
+Was fixed by doing filtering on the isWished field
+
+</details>
