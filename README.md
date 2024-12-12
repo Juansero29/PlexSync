@@ -12,13 +12,18 @@ This is a side project and in active development so not currently working.
 
 ## Current Challenges
 
-As of now I'm focusing on extracting my own "Wishlist" from SensCritique via GraphQL, which is now partially working, since it succesfully authenticates with SensCritique and returns a list of movies that I have interacted with in the past, but that are now in my "Wishlist"
+As of now I'm focusing on extracting my own "Wishlist" from SensCritique via GraphQL, which is now partially working, since it succesfully authenticates with SensCritique and returns a list of movies that I have interacted with in the past, but that are not actually in my "Wishlist"
 
 I'm trying to understand what "myWishes" query returns from the GraphQL API of SensCritique, which is not very clear to me as of now.
 
 ```ts
 async function getSensCritiqueWishlist() {
-  const client = await SensCritiqueGqlClient.build(process.env.SC_EMAIL!, process.env.SC_PASSWORD!);
+
+    const client = await SensCritiqueGqlClient.build(process.env.SC_EMAIL!, process.env.SC_PASSWORD!, {
+    headers: {
+        'Cache-Control': 'no-cache',
+    },
+    });
 
   const query = gql`
     query {
