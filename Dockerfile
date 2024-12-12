@@ -11,11 +11,14 @@ RUN npm install
 # Étape 4 : Copier le reste du projet
 COPY . .
 
-# Étape 5 : Compiler le TypeScript (optionnel si déjà pré-compilé)
+# Étape 5 : Compiler le TypeScript
 RUN npm run build
 
-# Étape 6 : Exposer le port (si l'application utilise un serveur, par exemple)
+# Étape 6 : Renommer index.js en index.mjs
+RUN mv dist/index.js dist/index.mjs
+
+# Étape 7 : Exposer le port (si l'application utilise un serveur)
 EXPOSE 3000
 
-# Étape 7 : Définir la commande par défaut pour démarrer l'application
-CMD ["npm", "start"]
+# Étape 8 : Définir la commande par défaut pour démarrer l'application
+CMD ["node", "--experimental-specifier-resolution=node", "dist/index.mjs"]
