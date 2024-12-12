@@ -1,11 +1,10 @@
-import * as dotenv from 'dotenv';
-import { SensCritiqueGqlClient } from "senscritique-graphql-api";
-import { gql } from "graphql-request";
-
+import dotenv from "dotenv";
 dotenv.config();
 
-console.log(`Using SensCritique account: ${process.env.SC_EMAIL}`);
+import { SensCritiqueGqlClient } from "senscritique-graphql-api";
+import { GraphQLClient, gql } from "graphql-request";
 
+console.log(`Using SensCritique account: ${process.env.SC_EMAIL}`);
 
 async function getSensCritiqueWishlist() {
   const client = await SensCritiqueGqlClient.build(process.env.SC_EMAIL!, process.env.SC_PASSWORD!);
