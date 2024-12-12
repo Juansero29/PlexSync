@@ -21,3 +21,6 @@ The commands that were used to initialize the project.
    1. Now there are 10 moderate severity vulnerabilities
 1. `npm install graphql-request` pour écrire des requêtes GraphQL facilement
 1. `npm install dotenv` pour gérer les variables d'environnement comme les clés API et mots de passe
+1. `npm install ts-node-dev --save-dev` Utilise ts-node-dev (un outil utile pour le développement rapide).
+1. `npm install jest ts-jest @types/jest --save-dev`
+1. `npx ts-jest config:init`
