@@ -120,7 +120,8 @@ async def search_movie_in_sc_diary(title, year, type):
     
 
 async def main():
-    await search_movie_in_sc_diary("Frozen", 2013, "movie")
+    # await search_movie_in_sc_diary("Frozen", 2013, "movie")
+    await print_both_watchlists()
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function

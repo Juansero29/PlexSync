@@ -53,7 +53,7 @@ class PlexClient:
             
             # Display each item in the watchlist
             for item in watchlist:
-                print(f"- {item.title} ({item.year})")
+                print(f"- {item.title} ({item.year}) Added to Watchlist at({item.userState.watchlistedAt})")
                 
             return watchlist
         
