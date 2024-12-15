@@ -1,10 +1,10 @@
 import dotenv from "dotenv";
-dotenv.config();
 
+import fetch from "node-fetch";
 import { SensCritiqueGqlClient } from "senscritique-graphql-api";
 import { gql } from "graphql-request";
+import { XMLParser } from "fast-xml-parser";
 
-console.log(`Using SensCritique account: ${process.env.SC_EMAIL}`);
 
 type Media = {
   avatar: string;
@@ -48,6 +48,50 @@ type Me = {
   url: string;
 };
 
+
+dotenv.config();
+
+console.log(`Using SensCritique account: ${process.env.SC_EMAIL}`);
+
+
+async function fetchPlexWatchlist(): Promise<void> {
+  const token = process.env.PLEX_TOKEN!;
+  const endpoint = `https://metadata.provider.plex.tv/library/sections/watchlist/all?X-Plex-Token=${token}`;
+
+  try {
+    console.log("Fetching watchlist from Plex...");
+
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch watchlist: ${response.statusText}`);
+    }
+
+    const xmlData = await response.text();
+
+    // Configure the XML parser to parse attributes
+    const parser = new XMLParser({
+      ignoreAttributes: false, // Ensures attributes like `title` and `year` are preserved
+      attributeNamePrefix: "", // Removes @ prefix from attribute keys
+    });
+    const jsonData = parser.parse(xmlData);
+
+    const watchlist = jsonData.MediaContainer?.Video || [];
+    if (watchlist.length === 0) {
+      console.log("Your Plex watchlist is empty.");
+    } else {
+      console.log("\nPlex Watchlist:");
+      watchlist.forEach((item: any) => {
+        const title = item?.title || item?.title || "Unknown Title";
+        const year = item?.year || item?.year || "Unknown Year";
+        console.log(`- ${title} (${year})`);
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching Plex watchlist:", error);
+  }
+}
+
+// Fetch User Wishes from SensCritique
 async function listUserWishes(): Promise<void> {
   const client = await SensCritiqueGqlClient.build(
     process.env.SC_EMAIL!,
@@ -107,28 +151,28 @@ async function listUserWishes(): Promise<void> {
   };
 
   try {
-    const currentTime = new Date().toLocaleString();
-    const data: UserWishesResponse = await client.request(userWishesQuery, variables);
+    const data = await client.request(userWishesQuery, variables);
 
-    // console.log(`[${currentTime}] User Wishes Response:`, JSON.stringify(data, null, 2));
-
-    // Example of structured display:
     console.log(`User ID: ${data.user.id}`);
     console.log(`User Avatar: ${data.user.medias.avatar}`);
     console.log("Wishes:");
-    data.user.wishes.forEach((wish) => {
+    data.user.wishes.forEach((wish: Product) => {
       console.log(`- ${wish.title} (${wish.year_of_production})`);
       console.log(`  Genres: ${wish.genres.join(", ")}`);
       console.log(`  Release Date: ${wish.release_date}`);
       console.log(`  Universe: ${wish.universe}`);
       console.log(`  Picture: ${wish.medias.picture}`);
     });
+    
   } catch (error) {
-    const currentTime = new Date().toLocaleString();
-    console.error(`[${currentTime}] Error fetching user wishes:`, error);
+    console.error("Error fetching user wishes:", error);
   }
 }
 
-
-// Call both functions to demonstrate both "me" and "List Wishes"
-listUserWishes();
+// Run Both Functions
+(async () => {
+  console.log("\nFetching SensCritique User Wishes...\n");
+  await listUserWishes();
+  console.log("Fetching Plex and SensCritique data...\n");
+  await fetchPlexWatchlist();
+})();

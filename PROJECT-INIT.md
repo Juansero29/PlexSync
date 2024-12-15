@@ -24,3 +24,4 @@ The commands that were used to initialize the project.
 1. `npm install ts-node-dev --save-dev` Utilise ts-node-dev (un outil utile pour le développement rapide).
 1. `npm install jest ts-jest @types/jest --save-dev`
 1. `npx ts-jest config:init`
+1. `npm install --save-dev @types/node-fetch @types/xml2js`
