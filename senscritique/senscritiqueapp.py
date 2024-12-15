@@ -1,13 +1,19 @@
 import firebase_admin
+import os
+from dotenv import load_dotenv
+
+
+# Load environment variables
+load_dotenv()
+
+SC_FIREBASE_API_KEY = os.getenv("SC_FIREBASE_API_KEY")
+
 
 class SensCritiqueApp:
 
-    # SensCritique GraphQL API URL
-    senscritiqueGQLApi = "https://gql.senscritique.com/graphql"
-
     # Firebase configuration (same as in the TypeScript code)
     firebaseConfig = {
-        "apiKey": 'AIzaSyAHxGE6otUcjogt6EXNzXrAZJr99WZ1MdI',
+        "apiKey": SC_FIREBASE_API_KEY,
         "authDomain": 'fir-sc-ea332.firebaseapp.com',
         "databaseURL": 'https://fir-sc-ea332.firebaseio.com',
         "projectId": 'fir-sc-ea332',

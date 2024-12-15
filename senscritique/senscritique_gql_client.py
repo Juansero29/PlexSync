@@ -39,7 +39,7 @@ class SensCritiqueGqlClient(Client):
         self.client = self
 
     @classmethod
-    def build(cls, email: str, password: str) -> 'SensCritiqueGqlClient':
+    def build(cls, email: str, password: str, use_apollo=False) -> 'SensCritiqueGqlClient':
         """
         Logs in using Firebase authentication via REST API and returns a SensCritiqueGqlClient instance.
         """
@@ -62,7 +62,10 @@ class SensCritiqueGqlClient(Client):
             
             print("Logged into firebase successfully!")
             
-            return cls(SensCritiqueApp.senscritiqueGQLApi, user_credentials)
+                   # Determine the appropriate API endpoint
+            api_url = "https://apollo.senscritique.com/" if use_apollo else "https://gql.senscritique.com/graphql"
+        
+            return cls(api_url, user_credentials)
         else:
             print(f"Error signing in: {response.text}")
             return None

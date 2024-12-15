@@ -22,15 +22,27 @@ None. I am now able to retrieve all active items in the wish list of an user. I 
 
 In order of priority
 
-1. Create a function that gets every film/series with a rating in Plex
-1. Create a function that gets every film/series with a rating in SC
-1. Create a function that puts all Plex ratings into SC
-1. Create a function that puts all SensCritique ratings into Plex
+### Sync ratings
+
+1. Create a function that gets every film/series/episode with a rating in Plex: recover it's id, it's title, year, type and rating.
+1. Create a function that gets every film/series with a rating in SC: recover it's id, it's title, year, type and rating.
+1. Create a function that puts each Plex rating into the corresponding SC item
+1. Create a function that puts each SensCritique rating into the corresponding Plex item rating
+
 1. Create a function that merges all ratings
    1. It gets all ratings from Plex and the rating date (or last watched date if not available)
-   1. It gets all ratings from SC and the date of rating (or last watched date if not available)
+   1. It gets all ratings from SC and the date of rating (or done_date if not available)
    1. Gets a list of films that are rated in both Plex and SC
-   1. For each film in the list, it puts the latest rating in both platforms
+   1. For each film in the list, it puts the latest rating in both platforms. Or else the lowest rating into the other one.
+
+### Sync watched items
+
+1. Create a function that gets every watched film/series/episode in Plex: recover it's watch_date, id, it's title, year, type and rating.
+1. Create a function that gets every watched film/series/episode in SC: recover it's watch_date, id, it's title, year, type and rating.
+1. Create a function that merges all watches
+   1. It gets all watches from Plex and the watch date
+   1. It gets all watches from SC and the watch date
+   1. It makes sure both Plex and SC items are marked as watched at the latest of the two dates
 
 ## Contribute
 

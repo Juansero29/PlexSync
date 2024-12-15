@@ -283,7 +283,6 @@ async def sync_watchlists():
 
     print("Watchlist synchronization complete.")
 
-
 async def main():
     # await search_movie_in_sc_diary("Frozen", 2013, "movie")
     await sync_watchlists()
