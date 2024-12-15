@@ -170,90 +170,90 @@ async function listUserWishes(): Promise<void> {
 }
 
 /**
- * Adds a movie or series to the user's wishlist on SensCritique.
- * @param title - The title of the movie or series.
- * @param year - The release year of the movie or series.
- * @param type - The type: "movie" or "series".
+ * Fetch media by title and release year, and return the media ID.
  */
-async function addToWishlist(title: string, year: number, type: "movie" | "series"): Promise<void> {
+async function fetchMediaId(title: string, year: number, universe: string): Promise<number | null> {
   const client = await SensCritiqueGqlClient.build(
     process.env.SC_EMAIL!,
     process.env.SC_PASSWORD!
   );
 
-  // Step 1: Search for the movie/series by title and year
-  const searchQuery = gql`
-    query SearchMedia($query: String!, $mediaType: String, $year: Int) {
-      search(query: $query, mediaType: $mediaType, year: $year) {
-        items {
-          id
-          title
-          year_of_production
-          universe
-          type
-          medias {
-            picture
+  const searchMediaQuery = gql`
+    query SearchMedia($keywords: String!, $universe: String) {
+      searchResult(keywords: $keywords, universe: $universe, limit: 5) {
+        results {
+          products_list {
+            id
+            title
+            year_of_production
           }
         }
       }
     }
   `;
 
-  const searchVariables = {
-    query: title,
-    mediaType: type,
-    year: year,
+  const variables = {
+    keywords: title,
+    universe: universe,
   };
 
-  try {
-    const searchResponse = await client.request(searchQuery, searchVariables);
-    const items = searchResponse.search.items;
+  const data = await client.request(searchMediaQuery, variables);
 
-    if (items.length === 0) {
-      console.log(`No ${type} found with title "${title}" and year "${year}".`);
-      return;
+  const results = data.searchResult.results[0].products_list;
+
+  for (const result of results) {
+    if (result.year_of_production === year) {
+      console.log(`Found media: ${result.title} (${result.year_of_production})`);
+      return result.id;
     }
+  }
 
-    const matchingItem = items[0]; // Assume the first match is the desired item
-    console.log(`Found ${type}: "${matchingItem.title}" (${matchingItem.year_of_production})`);
+  console.log(`No media found for "${title}" (${year}).`);
+  return null;
+}
 
-    // Step 2: Add the movie/series to the wishlist
-    const addToWishlistMutation = gql`
-      mutation AddToWishlist($id: Int!) {
-        addToWishlist(id: $id) {
-          id
-          title
-          myWish
-        }
-      }
-    `;
+/**
+ * Add media to SensCritique wishlist.
+ */
+async function addMediaToWishlist(title: string, year: number, universe: string): Promise<void> {
+  const mediaId = await fetchMediaId(title, year, universe);
+  
+  if (!mediaId) {
+    console.error("Media not found. Cannot add to wishlist.");
+    return;
+  }
 
-    const wishlistVariables = {
-      id: matchingItem.id,
-    };
+  const client = await SensCritiqueGqlClient.build(
+    process.env.SC_EMAIL!,
+    process.env.SC_PASSWORD!
+  );
 
-    const wishlistResponse = await client.request(addToWishlistMutation, wishlistVariables);
-    const addedItem = wishlistResponse.addToWishlist;
+  const addToWishlistMutation = gql`
+    mutation AddToWishlist($productId: Int!) {
+      productWish(productId: $productId)
+    }
+  `;
 
-    if (addedItem.myWish) {
-      console.log(`"${addedItem.title}" successfully added to your wishlist.`);
+  try {
+    const data = await client.request(addToWishlistMutation, { productId: mediaId });
+    if (data.productWish) {
+      console.log(`Successfully added media (ID: ${mediaId}) to the wishlist.`);
     } else {
-      console.log(`Failed to add "${addedItem.title}" to your wishlist.`);
+      console.error("Failed to add media to wishlist.");
     }
   } catch (error) {
-    console.error("Error adding to wishlist:", error);
+    console.error("Error adding media to wishlist:", error);
   }
 }
 
-// Example Usage
+// Example usage:
 (async () => {
-  await addToWishlist("Amadeus", 1984, "movie");
+  const title = "Amadeus";
+  const year = 1984;
+  const universe = "movie"; // or "tvshow"
+  // console.log("\nFetching SensCritique User Wishes...\n");
+  // await listUserWishes();
+  // console.log("Fetching Plex and SensCritique data...\n");
+  // await fetchPlexWatchlist();
+  await addMediaToWishlist(title, year, universe);
 })();
-
-// // Run Both Functions
-// (async () => {
-//   console.log("\nFetching SensCritique User Wishes...\n");
-//   await listUserWishes();
-//   console.log("Fetching Plex and SensCritique data...\n");
-//   await fetchPlexWatchlist();
-// })();
