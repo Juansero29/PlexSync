@@ -22,7 +22,8 @@ None. I am now able to retrieve all active items in the wish list of an user. I 
 
 In order of priority
 
-1. Create a function that allows to send all of the movies/series in SC's wishlist into Plex
+1. Create a function that removes an item (specified by id) from Plex watchlist
+1. Create a function that removes an item (specified by id) from SC wish list
 1. Create a function that synchronizes the wishes/watchlist between Plex and SC
    1. It should check that an item is not already in the list
    1. It should check that the two lists are identical at the end

@@ -1,15 +1,33 @@
-import locale
-from datetime import datetime
-
-# senscritique_client.py
 from .senscritique_gql_client import SensCritiqueGqlClient
-
+from datetime import datetime
 
 class SensCritiqueClient:
     def __init__(self, email, password, userId):
         """Initialize the client with a valid email and password."""
         self.client = SensCritiqueGqlClient.build(email, password)
         self.userId = userId
+
+    # Function to translate French month to English
+    def parse_french_date(self, date_str):
+        
+        months_in_french = {
+            'janvier': 'January', 'février': 'February', 'mars': 'March', 'avril': 'April', 'mai': 'May',
+            'juin': 'June', 'juillet': 'July', 'août': 'August', 'septembre': 'September', 'octobre': 'October',
+            'novembre': 'November', 'décembre': 'December'
+        }
+        
+        english_date = None
+        
+        for french_month, english_month in months_in_french.items():
+            if french_month in date_str:
+                english_date = date_str.replace(french_month, english_month)
+                break
+                
+        try:
+            parsed_date = datetime.strptime(english_date, "%d %B %Y")
+            return parsed_date
+        except Exception as e:
+            print(f"Failed to parse using strptime: {e}")
 
 
     async def fetch_user_wishes(self, limit=30):
@@ -50,7 +68,11 @@ class SensCritiqueClient:
                 title = wish.get("title", "Unknown Title")
                 year = wish.get("year_of_production", "Unknown Year")
                 genres = ", ".join(wish.get("genres", []))
-                release_date = wish.get("release_date", "Unknown Release Date")
+                
+                release_date_text = wish.get("release_date", "Unknown Release Date")
+
+                release_date = self.parse_french_date(release_date_text)
+            
                 universe = wish.get("universe", "Unknown Universe")
                 picture = wish["medias"].get("picture", "No picture available")
                 
@@ -69,8 +91,7 @@ class SensCritiqueClient:
             return user_wishes
         else:
             print("Error fetching user wishes: User not found.")
-            return []
-
+            return []  
 
     async def fetch_media_id(self, title, year, universe):
         media = await self.fetch_media(title, year, universe)
@@ -81,9 +102,6 @@ class SensCritiqueClient:
         
     async def fetch_media(self, title, year, universe): 
         """Fetch media by title, year, and universe."""
-        
-        # Set the locale to French to handle French date formatting
-        locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')  # 'fr_FR.UTF-8' handles French date format
         
         # Updated GraphQL query to fetch additional details like genres, release_date, universe, and picture
         query = """
@@ -132,9 +150,9 @@ class SensCritiqueClient:
                     if release_date:
                         try:
                             # Parse the French release date string to datetime object
-                            release_year = datetime.strptime(release_date, "%d %B %Y").year
-                            if release_year == year:
-                                print(f"Found media by release year: {product['title']} ({release_year})")
+                            release_date = self.parse_french_date(release_date)
+                            if release_date.year == year:
+                                print(f"Found media by release year: {product['title']} ({release_date.year})")
                                 print(f"Genres: {', '.join(product.get('genres', []))}")
                                 print(f"Release Date: {release_date}")
                                 print(f"Universe: {product.get('universe', 'Unknown')}")
@@ -148,7 +166,7 @@ class SensCritiqueClient:
         return None
 
 
-        async def add_media_to_wishlist(self, media_id):
+    async def add_media_to_wishlist(self, media_id):
             """Add a media item to the SensCritique wishlist."""
             mutation = """
                 mutation AddToWishlist($productId: Int!) {
@@ -173,3 +191,5 @@ class SensCritiqueClient:
                 print(f"Successfully added media {media_id} to the wishlist.")
             except Exception as e:
                 print(f"Error adding media {media_id} to wishlist: {e}")
+    
+
