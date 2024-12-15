@@ -37,7 +37,7 @@ async def main():
 
     # # Fetch and print the updated wishlist from SensCritique
     # print("\nFetching updated SensCritique Wishlist...")
-    # await sc_client.fetch_user_wishes()  # Make sure it's awaited
+    await sc_client.fetch_user_wishes()  # Make sure it's awaited
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
