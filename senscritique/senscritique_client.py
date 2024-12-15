@@ -73,6 +73,8 @@ class SensCritiqueClient:
 
                 release_date = self.parse_french_date(release_date_text)
             
+            
+                date_done = wish.get("date_done", "Unknown Done Date")
                 universe = wish.get("universe", "Unknown Universe")
                 picture = wish["medias"].get("picture", "No picture available")
                 
@@ -127,8 +129,6 @@ class SensCritiqueClient:
         variables = {"keywords": title, "universe": universe}
         response = await self.client.request(query, variables)
 
-        print(response)
-        
         # Ensure we are checking the 'data' key
         if "data" in response and "searchResult" in response["data"]:
             results = response["data"]["searchResult"]["results"]
@@ -179,17 +179,69 @@ class SensCritiqueClient:
             except Exception as e:
                 print(f"Error adding media {media_id} to wishlist: {e}")
 
-    async def add_media_to_wishlist(self, media_id):
-            """Add a media item to the SensCritique wishlist."""
-            mutation = """
-                mutation AddToWishlist($productId: Int!) {
-                    productWish(productId: $productId)
-                }
-            """
-            try:
-                await self.client.raw_request(mutation, {"productId": media_id})
-                print(f"Successfully added media {media_id} to the wishlist.")
-            except Exception as e:
-                print(f"Error adding media {media_id} to wishlist: {e}")
-    
+    async def remove_media_from_wishlist(self, media_id):
+        """Remove a media item from the SensCritique wishlist."""
+        mutation = """
+            mutation RemoveFromWishlist($productId: Int!) {
+                removeProductWish(productId: $productId)
+            }
+        """
+        try:
+            # Send the request with the mutation to remove the media from the wishlist
+            await self.client.raw_request(mutation, {"productId": media_id})
+            print(f"Successfully removed media {media_id} from the wishlist.")
+        except Exception as e:
+            print(f"Error removing media {media_id} from wishlist: {e}")
 
+
+    async def fetch_from_user_collections(self, id):
+            """Fetch a media from the user collections by its ID."""
+            
+            query = """
+            query UserDiary($isDiary:Boolean, $limit:Int, $offset:Int, $universe:String, $username:String!, $yearDateDone:Int) {
+                user(username:$username) {
+                    collection(isDiary:$isDiary limit:$limit offset:$offset universe:$universe yearDateDone:$yearDateDone) {
+                        products {
+                            id
+                            universe
+                            dateCreation
+                            dateLastUpdate
+                            category
+                            title
+                            originalTitle
+                            alternativeTitles
+                            yearOfProduction
+                            url
+                            otherUserInfos(username:$username) {
+                                dateDone
+                                rating
+                            }
+                        }
+                    }
+                }
+            }
+            """
+
+            # Set the variables for the query
+            variables = {
+                "isDiary": False,
+                "limit": 5000,
+                "offset": 0,
+                "universe": None,
+                "username": "juansero29",  # Replace with the correct username if needed
+                "yearDateDone": None
+            }
+
+            # Send the request using the GraphQL client
+            response = await self.client.request(query, variables, use_apollo=True)
+            
+            # Check the response data
+            if "data" in response and "user" in response["data"]:
+                # Find the product with the matching ID
+                products = response["data"]["user"]["collection"]["products"]
+                for product in products:
+                    if product["id"] == id:
+                        return product  # Return the product's data
+
+            print("No media found with the specified ID.")
+            return None

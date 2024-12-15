@@ -93,16 +93,19 @@ class SensCritiqueGqlClient(Client):
         else:
             raise Exception("User credentials are missing")
         
-    async def request(self, document: str, variables: dict = None):
+    async def request(self, document: str, variables: dict = None, use_apollo=False):
         """
         Executes a GraphQL query using the standard request method.
         """
-        return await self.raw_request(document, variables)
+        return await self.raw_request(document, variables, use_apollo)
 
-    async def raw_request(self, query, variables=None):
+    async def raw_request(self, query, variables=None, use_apollo=False):
         """Execute a raw GraphQL request with the provided query and variables."""
         if not self.client:
             raise ValueError("GraphQL client is not initialized.")
+        
+        # Determine the appropriate API endpoint
+        api_url = "https://apollo.senscritique.com/" if use_apollo else "https://gql.senscritique.com/graphql"
         
         # Get the Firebase ID Token
         token = self.get_id_token()
@@ -114,7 +117,8 @@ class SensCritiqueGqlClient(Client):
         # Prepare the request payload with the Authorization header and User-Agent
         headers = {
             "Authorization": token,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Content-Type": "application/json"
         }
         
         body = {
@@ -123,7 +127,7 @@ class SensCritiqueGqlClient(Client):
         }
         
         # Send the request with headers and query/variables
-        response = requests.post(SensCritiqueApp.senscritiqueGQLApi, json=body, headers=headers)
+        response = requests.post(api_url, json=body, headers=headers)
 
         # Log the response for debugging purposes
         # print(f"Response body: {response.text}")

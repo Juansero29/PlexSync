@@ -59,3 +59,18 @@ class PlexClient:
         
         except Exception as e:
             print(f"Error fetching Plex watchlist: {e}")
+
+
+    def remove_from_plex_watchlist(self, plex_media):
+        """Remove a movie or TV show from the Plex watchlist using its media object."""
+        try:
+            # Remove from Plex watchlist using the media's ratingKey
+            self.account.removeFromWatchlist(plex_media)
+            print(f"Successfully removed {plex_media.title} ({plex_media.year}) from the Plex watchlist.")
+
+        except BadRequest as e:
+            print(f"Bad request: {e}")
+        except NotFound as e:
+            print(f"Not found: {e}")
+        except Exception as e:
+            print(f"Error removing media with Plex ID {plex_media.guid} from watchlist: {e}")

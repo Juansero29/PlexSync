@@ -110,10 +110,17 @@ async def print_both_watchlists():
     except Exception as e:
         print(f"Error printing watchlists: {e}")
 
+async def search_movie_in_sc_diary(title, year, type):
+    media_id = await sc_client.fetch_media_id(title, year, universe=type)
+    
+    media = await sc_client.fetch_from_user_collections(media_id)
+    
+    print("Date Added To Wish List:", media["dateLastUpdate"])
+    
+    
 
 async def main():
-    # Sync all Plex watchlist items to SensCritique wishlist
-    await sync_scs_wishlist_to_plex()
+    await search_movie_in_sc_diary("Frozen", 2013, "movie")
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
