@@ -209,6 +209,7 @@ async def sync_watchlists():
     sc_titles = set()
 
     # Step 1: Add missing items (from Plex to SC and from SC to Plex)
+    # Iterate over Plex Watchlist
     for plex_media in plex_watchlist:
         title = plex_media.title
         year = plex_media.year
@@ -224,10 +225,26 @@ async def sync_watchlists():
                 await sc_client.add_media_to_wishlist(media_id)
                 update_sync_data(sync_data, plex_id, media_id, title, year, media_type, "synced")
 
+    # Iterate over SensCritique Wishlist and add missing items to Plex
+    for sc_media in sc_wishlist:
+        title = sc_media["title"]
+        year = sc_media["release_date"].year
+        media_type = sc_media["universe"]
+
+        # Check if it's already in sync data
+        sync_entry = find_sync_entry(sync_data, plex_id=None, sc_id=sc_media["id"])
+        if not sync_entry:
+            print(f"Adding '{title}' ({year}) to Plex watchlist...")
+            plex_media = plex_client.search_media_in_plex(title, year, content_type=media_type)
+            if plex_media:
+                plex_client.add_to_plex_watchlist(plex_media)
+                # Update the sync data after adding it to Plex
+                update_sync_data(sync_data, plex_media.guid, sc_media["id"], title, year, media_type, "synced")
+
     # After adding, refresh the lists
     plex_watchlist = plex_client.fetch_plex_watchlist()
     sc_wishlist = await sc_client.fetch_user_wishes()
-
+    
     # Step 2: Remove items no longer in the other list
     for entry in sync_data:
         title = entry["title"]

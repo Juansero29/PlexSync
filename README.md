@@ -22,10 +22,6 @@ None. I am now able to retrieve all active items in the wish list of an user. I 
 
 In order of priority
 
-1. Create a function that synchronizes the wishes/watchlist between Plex and SC
-   1. It should check that an item is not already in the list
-   1. It should check that the two lists are identical at the end
-      1. If lists are not identical, output the items that are missing and where they are missing
 1. Create a function that gets every film/series with a rating in Plex
 1. Create a function that gets every film/series with a rating in SC
 1. Create a function that puts all Plex ratings into SC
