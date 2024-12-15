@@ -2,9 +2,9 @@ from plexapi.myplex import MyPlexAccount
 from plexapi.exceptions import BadRequest
 
 class PlexClient:
-    def __init__(self, account: MyPlexAccount):
+    def __init__(self, plexUsername, plexToken):
         """Initialize with an authenticated Plex account."""
-        self.account = account
+        self.account = MyPlexAccount(plexUsername, token=plexToken)
 
     def search_movie_in_plex(self, title, year, content_type):
         """Search for a movie or TV show in Plex's catalog using the searchDiscover method."""
