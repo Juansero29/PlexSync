@@ -45,20 +45,24 @@ class PlexClient:
             print(f"Error adding media with Plex ID {plex_media.guid} to watchlist: {e}")
 
     def fetch_plex_watchlist(self):
-        """Fetches the current watchlist from Plex."""
-        try:
-            # Retrieve the user's watchlist
-            watchlist = self.account.watchlist()
-            print("Plex Watchlist:")
-            
-            # Display each item in the watchlist
-            for item in watchlist:
-                print(f"- {item.title} ({item.year}) Added to Watchlist at({item.userState.watchlistedAt})")
+            """Fetches the current watchlist from Plex."""
+            try:
+                # Retrieve the user's watchlist
+                watchlist = self.account.watchlist()
+                print("Plex Watchlist:")
                 
-            return watchlist
-        
-        except Exception as e:
-            print(f"Error fetching Plex watchlist: {e}")
+                # Display each item in the watchlist
+                for item in watchlist:
+                    # Fetch user state (this will include the date when the item was added to the watchlist)
+                    user_state = self.account.userState(item)
+                    added_at = user_state.watchlistedAt if user_state.watchlistedAt else "Unknown"
+                    
+                    print(f"- {item.title} ({item.year}) Added to Watchlist at {added_at}")
+                    
+                return watchlist
+            
+            except Exception as e:
+                print(f"Error fetching Plex watchlist: {e}")
 
 
     def remove_from_plex_watchlist(self, plex_media):
