@@ -3,6 +3,7 @@ import asyncio
 from dotenv import load_dotenv
 from senscritique.senscritique_client import SensCritiqueClient
 from plex.plex_client import PlexClient
+import json
 
 # Load environment variables
 load_dotenv()
@@ -132,63 +133,6 @@ async def remove_sc_wishlist_removed_items_in_plex():
     else:
         print("No items to remove from Plex Watchlist.")
 
-async def sync_watchlists():
-    """Sync both Plex and SC watchlists."""
-    print("Syncing Plex and SensCritique Watchlists...")
-
-    # Fetch current watchlists
-    plex_watchlist = plex_client.fetch_plex_watchlist()
-    sc_wishlist = await sc_client.fetch_user_wishes()
-
-    # Prepare a set of titles for comparison
-    plex_titles = set()
-    sc_titles = set()
-
-    if plex_watchlist:
-        plex_titles = set((plex_media.title, plex_media.year, plex_media.type) for plex_media in plex_watchlist)
-
-    if sc_wishlist:
-        sc_titles = set((media["title"], media["release_date"].year, media["universe"]) for media in sc_wishlist)
-
-    # Step 1: Add missing items (from Plex to SC and from SC to Plex)
-
-    # Items in Plex but not in SC (i.e., add these to SC)
-    items_to_add_to_sc = plex_titles - sc_titles
-    for title, year, universe in items_to_add_to_sc:
-        print(f"Adding '{title}' ({year}) to SensCritique wishlist...")
-        media_id = await sc_client.fetch_media_id(title, year, universe)
-        if media_id:
-            await sc_client.add_media_to_wishlist(media_id)
-
-    # Items in SC but not in Plex (i.e., add these to Plex)
-    items_to_add_to_plex = sc_titles - plex_titles
-    for title, year, universe in items_to_add_to_plex:
-        print(f"Adding '{title}' ({year}) to Plex watchlist...")
-        plex_media = plex_client.search_media_in_plex(title, year, content_type=universe)
-        if plex_media:
-            plex_client.add_to_plex_watchlist(plex_media)
-
-    # Step 2: Remove items no longer in the other list
-
-    # Items that are in both Plex and SC but missing from the other list
-    items_to_remove_from_plex = plex_titles - sc_titles
-    for title, year, universe in items_to_remove_from_plex:
-        print(f"Removing '{title}' ({year}) from Plex watchlist...")
-        plex_media = plex_client.search_media_in_plex(title, year, content_type=universe)
-        if plex_media:
-            plex_client.remove_from_plex_watchlist(plex_media)
-
-    # Items that are in both SC and Plex but missing from the other list
-    items_to_remove_from_sc = sc_titles - plex_titles
-    for title, year, universe in items_to_remove_from_sc:
-        print(f"Removing '{title}' ({year}) from SensCritique wishlist...")
-        media_id = await sc_client.fetch_media_id(title, year, universe)
-        if media_id:
-            await sc_client.remove_media_from_wishlist(media_id)
-
-    print("Watchlist synchronization complete.")
-
-
 async def add_media_to_all_services_watchlist(title, year, type):
     try:
         print(f"\nSearching for media from {year} on SensCritique...")
@@ -221,7 +165,103 @@ async def print_both_watchlists():
     except Exception as e:
         print(f"Error printing watchlists: {e}")
 
+
+def load_sync_data(file_path="sync_data.json"):
+    try:
+        with open(file_path, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []  # Return an empty list if the file doesn't exist
+
+def update_sync_data(sync_data, plex_id, sc_id, title, year, media_type, status, file_path="sync_data.json"):
+    item = {
+        "plex_id": plex_id,
+        "sc_id": sc_id,
+        "title": title,
+        "year": year,
+        "type": media_type,
+        "status": status
+    }
+    sync_data.append(item)
     
+    # Write updated sync data back to the file
+    with open(file_path, "w") as f:
+        json.dump(sync_data, f, indent=4)
+
+
+def find_sync_entry(sync_data, plex_id=None, sc_id=None):
+    for entry in sync_data:
+        if entry["plex_id"] == plex_id or entry["sc_id"] == sc_id:
+            return entry
+    return None
+
+async def sync_watchlists():
+    """Sync both Plex and SC watchlists."""
+    print("Syncing Plex and SensCritique Watchlists...")
+
+    # Fetch current watchlists
+    plex_watchlist = plex_client.fetch_plex_watchlist()
+    sc_wishlist = await sc_client.fetch_user_wishes()
+
+    # Load sync data from the persistent file
+    sync_data = load_sync_data()
+
+    plex_titles = set()
+    sc_titles = set()
+
+    # Step 1: Add missing items (from Plex to SC and from SC to Plex)
+    for plex_media in plex_watchlist:
+        title = plex_media.title
+        year = plex_media.year
+        media_type = plex_media.type
+        plex_id = plex_media.id
+
+        # Check if it's already in sync data
+        sync_entry = find_sync_entry(sync_data, plex_id=plex_id)
+        if not sync_entry:
+            print(f"Adding '{title}' ({year}) to SensCritique wishlist...")
+            media_id = await sc_client.fetch_media_id(title, year, universe=media_type)
+            if media_id:
+                await sc_client.add_media_to_wishlist(media_id)
+                update_sync_data(sync_data, plex_id, media_id, title, year, media_type, "synced")
+
+    # After adding, refresh the lists
+    plex_watchlist = plex_client.fetch_plex_watchlist()
+    sc_wishlist = await sc_client.fetch_user_wishes()
+
+    # Step 2: Remove items no longer in the other list
+    for entry in sync_data:
+        title = entry["title"]
+        year = entry["year"]
+        media_type = entry["type"]
+        status = entry["status"]
+
+        # Check if the item is still in Plex or SC
+        if status == "synced":
+            # Check if it's missing from Plex
+            if not any(p.title == title and p.year == year and p.type == media_type for p in plex_watchlist):
+                print(f"Removing '{title}' ({year}) from Plex watchlist...")
+                plex_media = plex_client.search_media_in_plex(title, year, content_type=media_type)
+                if plex_media:
+                    plex_client.remove_from_plex_watchlist(plex_media)
+                # Update the sync status
+                entry["status"] = "removed_from_plex"
+
+            # Check if it's missing from SC
+            if not any(s["title"] == title and s["release_date"].year == year and s["universe"] == media_type for s in sc_wishlist):
+                print(f"Removing '{title}' ({year}) from SensCritique wishlist...")
+                media_id = await sc_client.fetch_media_id(title, year, universe=media_type)
+                if media_id:
+                    await sc_client.remove_media_from_wishlist(media_id)
+                # Update the sync status
+                entry["status"] = "removed_from_sc"
+
+    # Save the updated sync data
+    with open("sync_data.json", "w") as f:
+        json.dump(sync_data, f, indent=4)
+
+    print("Watchlist synchronization complete.")
+
 
 async def main():
     # await search_movie_in_sc_diary("Frozen", 2013, "movie")
