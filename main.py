@@ -84,7 +84,7 @@ async def print_both_watchlists():
 
 async def main():
     # Sync all Plex watchlist items to SensCritique wishlist
-    await add_media_to_all_services_watchlist("Shrek 5", 2026, "movie")
+    await sync_plex_watchlist_to_sc()
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
