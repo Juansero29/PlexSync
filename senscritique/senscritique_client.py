@@ -35,15 +35,17 @@ class SensCritiqueClient:
             }
         }
         """
+        
         variables = {"id": self.userId, "limit": limit}
         
         response = await self.client.request(query, variables)
         
+        # Check if the response contains the expected data
         if "data" in response:
             user = response["data"]["user"]
-            print(f"User ID: {user['id']}")
-            print(f"User Avatar: {user['medias']['avatar']}")
-            print("Wishes:")
+            user_wishes = []  # Initialize an empty list to store the media information
+            
+            # Loop through the user's wishes and format the data
             for wish in user["wishes"]:
                 title = wish.get("title", "Unknown Title")
                 year = wish.get("year_of_production", "Unknown Year")
@@ -52,13 +54,22 @@ class SensCritiqueClient:
                 universe = wish.get("universe", "Unknown Universe")
                 picture = wish["medias"].get("picture", "No picture available")
                 
-                print(f"- {title} ({year})")
-                print(f"  Genres: {genres}")
-                print(f"  Release Date: {release_date}")
-                print(f"  Universe: {universe}")
-                print(f"  Picture: {picture}")
+                # Store the media details in the user_wishes list
+                media = {
+                    "title": title,
+                    "year": year,
+                    "genres": genres,
+                    "release_date": release_date,
+                    "universe": universe,
+                    "picture": picture
+                }
+                user_wishes.append(media)
+            
+            # Return the list of media
+            return user_wishes
         else:
             print("Error fetching user wishes: User not found.")
+            return []
 
 
     async def fetch_media_id(self, title, year, universe):
@@ -68,8 +79,6 @@ class SensCritiqueClient:
         else:
             return None
         
-
-
     async def fetch_media(self, title, year, universe): 
         """Fetch media by title, year, and universe."""
         

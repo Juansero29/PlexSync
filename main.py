@@ -21,15 +21,14 @@ sc_client = SensCritiqueClient(SC_EMAIL, SC_PASSWORD, SC_USER_ID)
 # Initialize Plex Client
 plex_client = PlexClient(PLEX_USERNAME, PLEX_TOKEN)
 
-
 async def sync_plex_watchlist_to_sc():
-    # Fetch all items in Plex Watchlist (no await here as the method is not asynchronous)
+    """Sync all items in Plex Watchlist to SensCritique's wishlist."""
+    
     print("Fetching Plex Watchlist...")
     plex_watchlist = plex_client.fetch_plex_watchlist()
 
     if plex_watchlist:
         for plex_media in plex_watchlist:
-            # Extract relevant information (title, year, and type)
             title = plex_media.title
             year = plex_media.year
             content_type = plex_media.type  # This will be either 'movie' or 'tvshow'
@@ -47,6 +46,37 @@ async def sync_plex_watchlist_to_sc():
     else:
         print("No items found in Plex Watchlist.")
 
+async def sync_scs_wishlist_to_plex():
+    """Sync all movies/series in SensCritique's wishlist into Plex's watchlist."""
+    
+    # Fetch the user's wishlist from SensCritique and store it in a variable
+    print("Fetching user wishlist from SensCritique...")
+    sc_wishlist = await sc_client.fetch_user_wishes(limit=30)  # Fetch the first 30 items
+    
+    if not sc_wishlist:
+        print("No wishlist found in SensCritique.")
+        return
+    
+    print(f"Found {len(sc_wishlist)} items in SensCritique wishlist.")
+    
+    # Iterate through each media in the wishlist
+    for media in sc_wishlist:
+        title = media["title"]
+        year = media["release_date"].year
+        universe = media["universe"]
+
+        print(f"Searching for '{title}' ({year}) in Plex...")
+
+        # Search for the movie/series in Plex
+        plex_media = plex_client.search_movie_in_plex(title, year, content_type=universe)
+
+        if plex_media:
+            print(f"Adding '{title}' ({year}) to Plex watchlist...")
+            plex_client.add_to_plex_watchlist(plex_media)
+        else:
+            print(f"'{title}' ({year}) not found in Plex.")
+    
+    print("Finished adding movies/series to Plex watchlist.")
 
 async def add_media_to_all_services_watchlist(title, year, type):
     try:
@@ -68,7 +98,6 @@ async def add_media_to_all_services_watchlist(title, year, type):
     except Exception as e:
         print(f"Error adding media to all services watchlist: {e}")
 
-
 async def print_both_watchlists():
     try:
         # Fetch and print the current wishlist from SensCritique
@@ -84,9 +113,7 @@ async def print_both_watchlists():
 
 async def main():
     # Sync all Plex watchlist items to SensCritique wishlist
-    await sync_plex_watchlist_to_sc()
+    await sync_scs_wishlist_to_plex()
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
-
-
