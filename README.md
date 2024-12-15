@@ -49,44 +49,82 @@ If you want to contribute:
 - Create the functions mentioned above to progress inside the project
 - Write clean code (cf. [Clean Code Book](https://github.com/jnguyen095/clean-code/blob/master/Clean.Code.A.Handbook.of.Agile.Software.Craftsmanship.pdf))
 
-## Before Compiling
+Here’s the rewritten version for Python:
 
-1. Clone the repo
-1. Create a file at the root of the repo named '.env' which has the following content
+## Before Running
 
-   ```raw
-   SC_EMAIL=senscritiquemail@yourmail.com
-   SC_PASSWORD=yoursenscritiquepassword
-   PLEX_IP=your_plex_server_ip
-   PLEX_TOKEN=your_plex_api_token
-   ```
+1. **Clone the Repository**
 
-   This file is ignored since it's included .gitignore, be sure to not commit it to keep your Plex and SensCritique account safe
+   - Use the following command to clone the repository:
 
-1. Now you can compile and deploy the project as described bellow
+     ```bash
+     git clone <repository_url>
+     cd <repository_directory>
+     ```
+
+2. **Create an Environment File**
+
+   - Create a file at the root of the repository named `.env` with the following content:
+
+     ```plaintext
+     SC_EMAIL=senscritiquemail@yourmail.com
+     SC_PASSWORD=yoursenscritiquepassword
+     PLEX_IP=your_plex_server_ip
+     PLEX_TOKEN=your_plex_api_token
+     ```
+
+   - **Important**: This file is included in `.gitignore` to prevent accidental commits. Ensure that you do not commit this file to keep your Plex and SensCritique credentials safe.
+
+3. **Install Dependencies**
+
+   - Run the following command to install the required Python libraries:
+
+     ```bash
+     pip install -r requirements.txt
+     ```
+
+4. **Run or Deploy the Project**
+   - Follow the instructions in the "Compiling & Deploying" section to run or deploy the project.
+
+---
+
+This structure aligns with Python development practices and emphasizes security with `.env` files. Let me know if you need further adjustments!
 
 ## Compiling & Deploying
 
-Commands to compile the project
+Commands to run and deploy the project.
 
-## Normal Compile
+## Running Locally
 
-1. `npm run build` - Compiles npm
-1. `node dist/index.js` - Deploys and runs
+1. **Install Dependencies**:
+   - `pip install -r requirements.txt` - Installs required Python libraries.
+2. **Run the Script**:
+   - `python main.py` - Executes the project.
 
-### Normal Compile using Docker
+### Running Locally Using Docker
 
-1. `npm run build` - Compiles npm
-1. `docker build -t plexsync .` - compiles docker image
-1. `docker run --env-file .env -p 3000:3000 plexsync` - deploys and runs docker image
+1. **Build Docker Image**:
+   - `docker build -t plexsync .` - Builds the Docker image.
+2. **Run Docker Container**:
+   - `docker run --env-file .env -p 3000:3000 plexsync` - Deploys and runs the Docker container.
 
-### Clean recompiling after errors
+### Clean Recompiling After Errors
 
-1. `rd -r "dist"`
-1. `npm run build`
-1. `docker system prune -f`
-1. `docker build -t plexsync .`
-1. `docker run --env-file .env -p 3000:3000 plexsync`
+1. **Remove Cached/Generated Files**:
+   - `rm -rf __pycache__` - Removes Python cache files.
+   - `rm -rf dist` - Removes any previous build directory (if applicable).
+2. **Rebuild Dependencies**:
+   - `pip install -r requirements.txt` - Reinstalls all dependencies.
+3. **Clean Docker Environment**:
+   - `docker system prune -f` - Removes unused Docker images and containers.
+4. **Rebuild Docker Image**:
+   - `docker build -t plexsync .` - Rebuilds the Docker image.
+5. **Run the Clean Docker Build**:
+   - `docker run --env-file .env -p 3000:3000 plexsync` - Deploys and runs the clean build.
+
+---
+
+This format reflects the typical workflow for Python projects and adapts the instructions for Python-specific tools and environments. Let me know if you need additional details or adjustments!
 
 ## Overcome Challenges
 
@@ -109,31 +147,33 @@ Commands to compile the project
   <summary><del>Code</del></summary>
 
 Old code causing trouble
+
 ```ts
-    async function getSensCritiqueWishlist() {
-
-        const client = await SensCritiqueGqlClient.build(process.env.SC_EMAIL!, process.env.SC_PASSWORD!, {
-        headers: {
-            'Cache-Control': 'no-cache',
-        },
-        });
-
-    const query = gql`
-        query {
-        myWishes {
-            id
-            title
-            year_of_production
-        }
-        }
-    `;
-
-    const data = await client.request(query);
-    console.log("Wishlist from SensCritique:", data.myWishes);
-
+async function getSensCritiqueWishlist() {
+  const client = await SensCritiqueGqlClient.build(
+    process.env.SC_EMAIL!,
+    process.env.SC_PASSWORD!,
+    {
+      headers: {
+        "Cache-Control": "no-cache",
+      },
     }
+  );
 
-````
+  const query = gql`
+    query {
+      myWishes {
+        id
+        title
+        year_of_production
+      }
+    }
+  `;
+
+  const data = await client.request(query);
+  console.log("Wishlist from SensCritique:", data.myWishes);
+}
+```
 
 Current output:
 
@@ -146,7 +186,7 @@ Wishlist from SensCritique: [s\PlexSync>
   { id: 42234, title: 'The Office (US)', year_of_production: 2005 },
   { id: 374603, title: 'Les Soprano', year_of_production: 1999 }
 ]
-````
+```
 
 Was fixed by doing filtering on the isWished field
 

@@ -1,0 +1,5 @@
+python-dotenv
+requests
+plexapi
+gql[all]  # Installs gql with all supported transports
+tqdm
