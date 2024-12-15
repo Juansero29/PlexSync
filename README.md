@@ -6,17 +6,22 @@ This is a _WORK IN PROGRESS (WIP) as of 12th December 2024_
 
 The tool aims to provide synchronization of watchlist, watch history and ratings between Plex and other services.
 
-First aim will be to provide synchronization with SensCritique, communicating with its GraphQL API thanks to the work done on [senscritique-graphql-api](https://github.com/NitriKx/senscritique-graphql-api) by [NitriKx](https://github.com/NitriKx/).
+First aim will be to provide synchronization with SensCritique, communicating with its GraphQL API thanks to the work done on [senscritique-graphql-api](https://github.com/NitriKx/senscritique-graphql-api) by [NitriKx](https://github.com/NitriKx/) translated into Python since Plex's SDK is best in python than in TypeScript (I had started in TypeScript and gave up).
 
-This is a side project and in active development so not currently working.
+This is a side project and in active development.
 
 ## Glosary
 
 - SC: [SensCritique](https://www.senscritique.com/)
 
+## Current Features
+
+- It can sync watchlists between Plex and SensCritique. Lots of challenges overcome over the week-end, could solve them with Postman Interceptor and ChatGPT help. I've never coded Python before so... yeah. Expect fuzzy stuff in the code.
+- Sync works trough a persisted offline file which keeps track of items synced in both platforms, and whenever one gets removed to remove it in the other. Seems to work like a charm.
+
 ## Current Challenges
 
-None. I am now able to retrieve all active items in the wish list of an user. I just need to get on with goal number one whenever I have the time.
+Create functions for ratings and for watched items, and synched them. Probably each on a different sync persisted file? Or maybe all in the same sync_data.json. Dunno.
 
 ## Goals
 
@@ -48,11 +53,9 @@ In order of priority
 
 If you want to contribute:
 
-- Help me understand and document the GraphQL API, as most of its methods are obscure and have no related documentation even thoug the names are good leads
+- Help me understand and document the GraphQL API, as most of its methods are obscure and have no related documentation eventhough the names are good leads
 - Create the functions mentioned above to progress inside the project
 - Write clean code (cf. [Clean Code Book](https://github.com/jnguyen095/clean-code/blob/master/Clean.Code.A.Handbook.of.Agile.Software.Craftsmanship.pdf))
-
-Here’s the rewritten version for Python:
 
 ## Before Running
 
@@ -69,12 +72,19 @@ Here’s the rewritten version for Python:
 
    - Create a file at the root of the repository named `.env` with the following content:
 
-     ```plaintext
-     SC_EMAIL=senscritiquemail@yourmail.com
-     SC_PASSWORD=yoursenscritiquepassword
-     PLEX_IP=your_plex_server_ip
-     PLEX_TOKEN=your_plex_api_token
-     ```
+   ```plaintext
+
+   # SensCritique
+   PLEX_SERVER=your_plex_server_name
+   PLEX_TOKEN=your_plex_api_token
+   PLEX_USERNAME=your_plex_username
+   PLEX_PASSWORD=your_plex_password
+
+   # SensCritique
+   SC_EMAIL=senscritiquemail@yourmail.com
+   SC_PASSWORD=yoursenscritiquepassword
+   SC_USER_ID=your-senscritique-userid
+   ```
 
    - **Important**: This file is included in `.gitignore` to prevent accidental commits. Ensure that you do not commit this file to keep your Plex and SensCritique credentials safe.
 
@@ -88,10 +98,6 @@ Here’s the rewritten version for Python:
 
 4. **Run or Deploy the Project**
    - Follow the instructions in the "Compiling & Deploying" section to run or deploy the project.
-
----
-
-This structure aligns with Python development practices and emphasizes security with `.env` files. Let me know if you need further adjustments!
 
 ## Compiling & Deploying
 
@@ -124,10 +130,6 @@ Commands to run and deploy the project.
    - `docker build -t plexsync .` - Rebuilds the Docker image.
 5. **Run the Clean Docker Build**:
    - `docker run --env-file .env -p 3000:3000 plexsync` - Deploys and runs the clean build.
-
----
-
-This format reflects the typical workflow for Python projects and adapts the instructions for Python-specific tools and environments. Let me know if you need additional details or adjustments!
 
 ## Overcome Challenges
 

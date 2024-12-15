@@ -187,7 +187,6 @@ def update_sync_data(sync_data, plex_id, sc_id, title, year, media_type, status,
     with open(file_path, "w") as f:
         json.dump(sync_data, f, indent=4)
 
-
 def find_sync_entry(sync_data, plex_id=None, sc_id=None):
     for entry in sync_data:
         if entry["plex_id"] == plex_id or entry["sc_id"] == sc_id:
