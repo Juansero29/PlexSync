@@ -7,17 +7,35 @@ import time
 from gql.transport.requests import RequestsHTTPTransport
 from .senscritiqueapp import SensCritiqueApp
 
+import json
+import requests
+from typing import Optional
+from gql import Client, gql
+import base64
+import time
+from gql.transport.requests import RequestsHTTPTransport
+from .senscritiqueapp import SensCritiqueApp
+
 
 class SensCritiqueGqlClient(Client):
     def __init__(self, url: str, user_credentials: dict):
         self.user_credentials = user_credentials
         self.id_token = None
-        
-        # Initialize the parent Client class (this will set up the internal `client` attribute)
-        transport = RequestsHTTPTransport(url=url)
+
+        # Get the Firebase ID Token
+        token = self.get_id_token()
+
+        # Define headers with Authorization and User-Agent
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
+        # Initialize the parent Client class with the necessary transport
+        transport = RequestsHTTPTransport(url=url, headers=headers)
         super().__init__(transport=transport)
         
-        # Ensure that the `client` attribute is initialized after calling super
+        # Ensure the `client` attribute is initialized after calling super
         self.client = self
 
     @classmethod
@@ -41,6 +59,9 @@ class SensCritiqueGqlClient(Client):
         if response.status_code == 200:
             # Parse the user credentials from the Firebase response
             user_credentials = response.json()
+            
+            print("Logged into firebase successfully!")
+            
             return cls(SensCritiqueApp.senscritiqueGQLApi, user_credentials)
         else:
             print(f"Error signing in: {response.text}")
@@ -71,15 +92,43 @@ class SensCritiqueGqlClient(Client):
             return id_token
         else:
             raise Exception("User credentials are missing")
-
-    def request(self, document: str, variables: dict = None, request_headers: Optional[dict] = None):
+        
+    async def request(self, document: str, variables: dict = None):
         """
         Executes a GraphQL query using the standard request method.
         """
-        return self.raw_request(document, variables, request_headers)
-    
-    def raw_request(self, query, variables=None):
+        return await self.raw_request(document, variables)
+
+    async def raw_request(self, query, variables=None):
         """Execute a raw GraphQL request with the provided query and variables."""
         if not self.client:
             raise ValueError("GraphQL client is not initialized.")
-        return self.client.execute(gql(query), variable_values=variables)
+        
+        # Get the Firebase ID Token
+        token = self.get_id_token()
+
+        # Check if the token is valid and complete
+        if not token or len(token.split('.')) != 3:
+            raise ValueError("Invalid Firebase ID token. Make sure you're passing the complete JWT.")
+
+        # Prepare the request payload with the Authorization header and User-Agent
+        headers = {
+            "Authorization": token,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        
+        body = {
+            "query": query,
+            "variables": variables
+        }
+        
+        # Send the request with headers and query/variables
+        response = requests.post(SensCritiqueApp.senscritiqueGQLApi, json=body, headers=headers)
+
+        # Log the response for debugging purposes
+        # print(f"Response body: {response.text}")
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise ValueError(f"Request failed with status {response.status_code}: {response.text}")
