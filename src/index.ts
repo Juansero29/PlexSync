@@ -169,10 +169,91 @@ async function listUserWishes(): Promise<void> {
   }
 }
 
-// Run Both Functions
+/**
+ * Adds a movie or series to the user's wishlist on SensCritique.
+ * @param title - The title of the movie or series.
+ * @param year - The release year of the movie or series.
+ * @param type - The type: "movie" or "series".
+ */
+async function addToWishlist(title: string, year: number, type: "movie" | "series"): Promise<void> {
+  const client = await SensCritiqueGqlClient.build(
+    process.env.SC_EMAIL!,
+    process.env.SC_PASSWORD!
+  );
+
+  // Step 1: Search for the movie/series by title and year
+  const searchQuery = gql`
+    query SearchMedia($query: String!, $mediaType: String, $year: Int) {
+      search(query: $query, mediaType: $mediaType, year: $year) {
+        items {
+          id
+          title
+          year_of_production
+          universe
+          type
+          medias {
+            picture
+          }
+        }
+      }
+    }
+  `;
+
+  const searchVariables = {
+    query: title,
+    mediaType: type,
+    year: year,
+  };
+
+  try {
+    const searchResponse = await client.request(searchQuery, searchVariables);
+    const items = searchResponse.search.items;
+
+    if (items.length === 0) {
+      console.log(`No ${type} found with title "${title}" and year "${year}".`);
+      return;
+    }
+
+    const matchingItem = items[0]; // Assume the first match is the desired item
+    console.log(`Found ${type}: "${matchingItem.title}" (${matchingItem.year_of_production})`);
+
+    // Step 2: Add the movie/series to the wishlist
+    const addToWishlistMutation = gql`
+      mutation AddToWishlist($id: Int!) {
+        addToWishlist(id: $id) {
+          id
+          title
+          myWish
+        }
+      }
+    `;
+
+    const wishlistVariables = {
+      id: matchingItem.id,
+    };
+
+    const wishlistResponse = await client.request(addToWishlistMutation, wishlistVariables);
+    const addedItem = wishlistResponse.addToWishlist;
+
+    if (addedItem.myWish) {
+      console.log(`"${addedItem.title}" successfully added to your wishlist.`);
+    } else {
+      console.log(`Failed to add "${addedItem.title}" to your wishlist.`);
+    }
+  } catch (error) {
+    console.error("Error adding to wishlist:", error);
+  }
+}
+
+// Example Usage
 (async () => {
-  console.log("\nFetching SensCritique User Wishes...\n");
-  await listUserWishes();
-  console.log("Fetching Plex and SensCritique data...\n");
-  await fetchPlexWatchlist();
+  await addToWishlist("Amadeus", 1984, "movie");
 })();
+
+// // Run Both Functions
+// (async () => {
+//   console.log("\nFetching SensCritique User Wishes...\n");
+//   await listUserWishes();
+//   console.log("Fetching Plex and SensCritique data...\n");
+//   await fetchPlexWatchlist();
+// })();
