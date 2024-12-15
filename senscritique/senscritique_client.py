@@ -29,7 +29,6 @@ class SensCritiqueClient:
         except Exception as e:
             print(f"Failed to parse using strptime: {e}")
 
-
     async def fetch_user_wishes(self, limit=30):
         """Fetch the wishlist of the authenticated user."""
         
@@ -59,44 +58,47 @@ class SensCritiqueClient:
         
         response = await self.client.request(query, variables)
         
+        print("SensCritique watchlist:")
+        
         # Check if the response contains the expected data
         if "data" in response:
             user = response["data"]["user"]
             user_wishes = []  # Initialize an empty list to store the media information
             
-            # Loop through the user's wishes and format the data
-            for wish in user["wishes"]:
-                title = wish.get("title", "Unknown Title")
-                year = wish.get("year_of_production", "Unknown Year")
-                genres = ", ".join(wish.get("genres", []))
-                id = wish.get("id", "Unknown ID")
-                release_date_text = wish.get("release_date", "Unknown Release Date")
+            if(user["wishes"]):
+                # Loop through the user's wishes and format the data
+                for wish in user["wishes"]:
+                    title = wish.get("title", "Unknown Title")
+                    year = wish.get("year_of_production", "Unknown Year")
+                    genres = ", ".join(wish.get("genres", []))
+                    id = wish.get("id", "Unknown ID")
+                    release_date_text = wish.get("release_date", "Unknown Release Date")
 
-                release_date = self.parse_french_date(release_date_text)
-        
-                date_wishlisted = await self.fetch_date_when_item_was_last_wishlisted_by_user(id)
-    
-                universe = wish.get("universe", "Unknown Universe")
-                picture = wish["medias"].get("picture", "No picture available")
-                
-                # Store the media details in the user_wishes list
-                media = {
-                    "id": id,
-                    "date_wishlisted": date_wishlisted,
-                    "title": title,
-                    "year": year,
-                    "genres": genres,
-                    "release_date": release_date,
-                    "universe": universe,
-                    "picture": picture
-                }
-                
-                print(f"- {media['title']} ({media['release_date'].year}) Added to Wish List at {media['date_wishlisted']} - [{media['id']}]")
-
-                user_wishes.append(media)
+                    release_date = self.parse_french_date(release_date_text)
             
-            # Return the list of media
-            return user_wishes
+                    date_wishlisted = await self.fetch_date_when_item_was_last_wishlisted_by_user(id)
+        
+                    universe = wish.get("universe", "Unknown Universe")
+                    picture = wish["medias"].get("picture", "No picture available")
+                    
+                    # Store the media details in the user_wishes list
+                    media = {
+                        "id": id,
+                        "date_wishlisted": date_wishlisted,
+                        "title": title,
+                        "year": year,
+                        "genres": genres,
+                        "release_date": release_date,
+                        "universe": universe,
+                        "picture": picture
+                    }
+                    
+                    print(f"- {media['title']} ({media['release_date'].year}) Added to Wish List at {media['date_wishlisted']} - [{media['id']}]")
+
+                    user_wishes.append(media)
+                
+                # Return the list of media
+                return user_wishes
         else:
             print("Error fetching user wishes: User not found.")
             return []  
@@ -157,7 +159,7 @@ class SensCritiqueClient:
                         try:
                             # Parse the French release date string to datetime object
                             release_date = self.parse_french_date(release_date)
-                            if release_date.year == year:
+                            if release_date and release_date.year == year:
                                 print(f"Found media by release year: {product['title']} ({release_date.year})")
                                 print(f"Genres: {', '.join(product.get('genres', []))}")
                                 print(f"Release Date: {release_date}")
@@ -168,7 +170,7 @@ class SensCritiqueClient:
                         except ValueError:
                             print(f"Could not parse release date: {release_date}")
 
-        print(f"No media found for '{title}' ({year}).")
+        print(f"No media found for '{title}' ({year}) in SensCritique")
         return None
 
     async def add_media_to_wishlist(self, media_id):
@@ -188,7 +190,7 @@ class SensCritiqueClient:
         """Remove a media item from the SensCritique wishlist."""
         mutation = """
             mutation RemoveFromWishlist($productId: Int!) {
-                removeProductWish(productId: $productId)
+                productUnwish(productId: $productId)
             }
         """
         try:

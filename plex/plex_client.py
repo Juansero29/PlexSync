@@ -6,7 +6,7 @@ class PlexClient:
         """Initialize with an authenticated Plex account."""
         self.account = MyPlexAccount(plexUsername, token=plexToken)
 
-    def search_movie_in_plex(self, title, year, content_type):
+    def search_media_in_plex(self, title, year, content_type):
         """Search for a movie or TV show in Plex's catalog using the searchDiscover method."""
         try:
             # Search Plex Discover for the given title and content type
@@ -55,9 +55,9 @@ class PlexClient:
                 for item in watchlist:
                     # Fetch user state (this will include the date when the item was added to the watchlist)
                     user_state = self.account.userState(item)
-                    added_at = user_state.watchlistedAt if user_state.watchlistedAt else "Unknown"
+                    item.added_at = user_state.watchlistedAt if user_state.watchlistedAt else "Unknown"
                     
-                    print(f"- {item.title} ({item.year}) Added to Watchlist at {added_at}")
+                    print(f"- {item.title} ({item.year}) Added to Watchlist at {item.added_at}")
                     
                 return watchlist
             
