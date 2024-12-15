@@ -41,6 +41,7 @@ class SensCritiqueClient:
                     avatar
                 }
                 wishes(limit: $limit) {
+                    id
                     title
                     year_of_production
                     genres
@@ -68,18 +69,20 @@ class SensCritiqueClient:
                 title = wish.get("title", "Unknown Title")
                 year = wish.get("year_of_production", "Unknown Year")
                 genres = ", ".join(wish.get("genres", []))
-                
+                id = wish.get("id", "Unknown ID")
                 release_date_text = wish.get("release_date", "Unknown Release Date")
 
                 release_date = self.parse_french_date(release_date_text)
-            
-            
-                date_done = wish.get("date_done", "Unknown Done Date")
+        
+                date_wishlisted = await self.fetch_date_when_item_was_last_wishlisted_by_user(id)
+    
                 universe = wish.get("universe", "Unknown Universe")
                 picture = wish["medias"].get("picture", "No picture available")
                 
                 # Store the media details in the user_wishes list
                 media = {
+                    "id": id,
+                    "date_wishlisted": date_wishlisted,
                     "title": title,
                     "year": year,
                     "genres": genres,
@@ -87,6 +90,9 @@ class SensCritiqueClient:
                     "universe": universe,
                     "picture": picture
                 }
+                
+                print(f"- {media['title']} ({media['release_date'].year}) Added to Wish List at {media['date_wishlisted']} - [{media['id']}]")
+
                 user_wishes.append(media)
             
             # Return the list of media
@@ -165,7 +171,6 @@ class SensCritiqueClient:
         print(f"No media found for '{title}' ({year}).")
         return None
 
-
     async def add_media_to_wishlist(self, media_id):
             """Add a media item to the SensCritique wishlist."""
             mutation = """
@@ -192,7 +197,6 @@ class SensCritiqueClient:
             print(f"Successfully removed media {media_id} from the wishlist.")
         except Exception as e:
             print(f"Error removing media {media_id} from wishlist: {e}")
-
 
     async def fetch_from_user_collections(self, id):
             """Fetch a media from the user collections by its ID."""
@@ -245,3 +249,34 @@ class SensCritiqueClient:
 
             print("No media found with the specified ID.")
             return None
+
+    async def fetch_date_when_item_was_last_wishlisted_by_user(self, id):
+            """Fetch the date when the item was last wishlisted."""
+            query = """
+            query Feed($limit: Int, $offset: Int, $productId: Int, $userId: Int, $excludeArchive: Boolean) { feed(limit: $limit, offset: $offset, productId: $productId, userId: $userId, excludeArchive: $excludeArchive) { feeds { dateCreation   isWishList product { id } } } }
+            """
+            
+            variables = {
+                "limit": 10,
+                "offset": 0,
+                "productId": id,
+                "userId": int(self.userId),
+                "excludeArchive": False
+            }
+            
+            
+            try:
+                response = await self.client.request(query, variables, use_apollo=True)
+                
+                if response and 'data' in response and 'feed' in response['data']:
+                    feeds = response['data']['feed'][0]['feeds']
+                    for feed in feeds:
+                        if feed['isWishList']:
+                            # If the item is wishlisted, return the creation date
+                            date_creation = feed['dateCreation']
+                            return datetime.strptime(date_creation, "%Y-%m-%dT%H:%M:%S.%fZ")  # Parse the date
+                
+                return None  # Return None if no matching wishlisted item is found
+            except Exception as e:
+                print(f"Error fetching date: {e}")
+                return None
