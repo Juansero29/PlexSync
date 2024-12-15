@@ -54,6 +54,8 @@ class PlexClient:
             # Display each item in the watchlist
             for item in watchlist:
                 print(f"- {item.title} ({item.year})")
+                
+            return watchlist
         
         except Exception as e:
             print(f"Error fetching Plex watchlist: {e}")
