@@ -100,7 +100,7 @@ class SensCritiqueClient:
                         # Accessing picture directly since 'medias' is an object, not a list
                         picture = product["medias"].get("picture", "No picture available")
                         print(f"Picture: {picture}")
-                        return product["id"]
+                        return product
 
         print(f"No media found for '{title}' ({year}).")
         return None
