@@ -58,7 +58,11 @@ class SensCritiqueClient:
             print("Error fetching user wishes: User not found.")
 
 
-    async def fetch_media_id(self, title, year, universe): 
+    async def fetch_media_id(self, title, year, universe):
+        media = await self.fetch_media(title, year, universe)
+        return media["id"]
+        
+    async def fetch_media(self, title, year, universe): 
         """Fetch media by title, year, and universe."""
         
         # Updated GraphQL query to fetch additional details like genres, release_date, universe, and picture

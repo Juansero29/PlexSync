@@ -22,8 +22,6 @@ None. I am now able to retrieve all active items in the wish list of an user. I 
 
 In order of priority
 
-1. Create a function that retrieves a movie/series inside Plex when searched by its title and release date, with its rating
-1. Create a function that retrieves a movie/series inside SC when searched by its title and release date, with its rating
 1. Create a function that allows to send all of the movies/series in Plex's watchlist into SC wishlist
 1. Create a function that allows to send all of the movies/series in SC's wishlist into Plex
 1. Create a function that synchronizes the wishes/watchlist between Plex and SC

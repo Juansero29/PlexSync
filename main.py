@@ -9,7 +9,7 @@ load_dotenv()
 
 SC_EMAIL = os.getenv("SC_EMAIL")
 SC_PASSWORD = os.getenv("SC_PASSWORD")
-SC_USER_ID=os.getenv("SC_USER_ID")
+SC_USER_ID = os.getenv("SC_USER_ID")
 
 PLEX_TOKEN = os.getenv("PLEX_TOKEN")
 PLEX_USERNAME = os.getenv("PLEX_USERNAME")
@@ -20,34 +20,46 @@ sc_client = SensCritiqueClient(SC_EMAIL, SC_PASSWORD, SC_USER_ID)
 
 # Initialize Plex Client
 plex_client = PlexClient(PLEX_USERNAME, PLEX_TOKEN)
-    
-
-async def main():
-    await add_media_to_all_services_watchlist("Frozen", 2013, "movie")
-    
-if __name__ == "__main__":
-    asyncio.run(main())  # This will run the async main function
 
 
 async def add_media_to_all_services_watchlist(title, year, type):
-    print(f"\nSearching for media from {year} on SensCritique...")
-    media = await sc_client.fetch_media_id(title, year, universe= type)
-    if media:
-        await sc_client.add_media_to_wishlist(media["id"])
+    try:
+        print(f"\nSearching for media from {year} on SensCritique...")
+        media_id = await sc_client.fetch_media_id(title, year, universe=type)
+        if media_id:
+            await sc_client.add_media_to_wishlist(media_id)
 
-    await sc_client.fetch_user_wishes()
-    
-    media = plex_client.search_movie_in_plex(title, year, content_type=type)
-    
-    if media:
-        plex_client.add_to_plex_watchlist(media)
+        # Fetch updated wishlist after adding media
+        await sc_client.fetch_user_wishes()
+
+        print(f"\nSearching for media from {year} on Plex...")
+        plex_media = plex_client.search_movie_in_plex(title, year, content_type=type)
+
+        if plex_media:
+            plex_client.add_to_plex_watchlist(plex_media)
+        else:
+            print(f"Media '{title}' ({year}) not found in Plex.")
+    except Exception as e:
+        print(f"Error adding media to all services watchlist: {e}")
 
 
-async def print_both_wathclists():
-    # Fetch and print the current wishlist from SensCritique
-    print("Fetching current SensCritique Wishlist...")
-    await sc_client.fetch_user_wishes()  # Make sure it's awaited
-    
+async def print_both_watchlists():
+    try:
         # Fetch and print the current wishlist from SensCritique
-    print("Fetching current Plex Watchlist...")
-    plex_client.fetch_plex_watchlist()  # Make sure it's awaited
+        print("Fetching current SensCritique Wishlist...")
+        await sc_client.fetch_user_wishes()
+
+        # Fetch and print the current watchlist from Plex
+        print("Fetching current Plex Watchlist...")
+        plex_client.fetch_plex_watchlist()
+    except Exception as e:
+        print(f"Error printing watchlists: {e}")
+
+
+async def main():
+    await add_media_to_all_services_watchlist("Frozen", 2013, "movie")
+    await print_both_watchlists()
+
+    
+if __name__ == "__main__":
+    asyncio.run(main())  # This will run the async main function
