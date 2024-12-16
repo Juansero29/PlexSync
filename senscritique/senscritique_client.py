@@ -1,11 +1,24 @@
 from .senscritique_gql_client import SensCritiqueGqlClient
 from datetime import datetime
+import os
+import asyncio
+from dotenv import load_dotenv
+from plex.plex_client import PlexClient
+import json
+
+# Load environment variables
+load_dotenv()
+
+SC_EMAIL = os.getenv("SC_EMAIL")
+SC_PASSWORD = os.getenv("SC_PASSWORD")
+SC_USER_ID = os.getenv("SC_USER_ID")
+SC_USERNAME = os.getenv("SC_USERNAME")
 
 class SensCritiqueClient:
-    def __init__(self, email, password, userId):
+    def __init__(self):
         """Initialize the client with a valid email and password."""
-        self.client = SensCritiqueGqlClient.build(email, password)
-        self.userId = userId
+        self.client = SensCritiqueGqlClient.build(SC_EMAIL, SC_PASSWORD)
+        self.userId = SC_USER_ID
 
     # Function to translate French month to English
     def parse_french_date(self, date_str):
@@ -282,3 +295,74 @@ class SensCritiqueClient:
             except Exception as e:
                 print(f"Error fetching date: {e}")
                 return None
+            
+    async def get_user_rated_media(self, limit=100, offset=0, universe=None):
+        """Fetch all rated shows from the user's collection."""
+        
+        query = """
+        query UserDiary($isDiary: Boolean, $limit: Int, $offset: Int, $universe: String, $username: String!, $yearDateDone: Int) {
+          user(username: $username) {
+            collection(isDiary: $isDiary, limit: $limit, offset: $offset, universe: $universe, yearDateDone: $yearDateDone) {
+              products {
+                id
+                universe
+                dateCreation
+                dateLastUpdate
+                category
+                title
+                originalTitle
+                alternativeTitles
+                yearOfProduction
+                url
+                otherUserInfos(username: $username) {
+                  dateDone
+                  rating
+                }
+              }
+            }
+          }
+        }
+        """
+        
+        variables = {
+            "isDiary": False,  # Ensures we're fetching all items, not only items marked as 'diary'
+            "limit": limit,
+            "offset": offset,
+            "universe": universe,  # Optional: could be "movie", "tvshow", etc.
+            "username": SC_USERNAME,
+            "yearDateDone": None  # You can set this to filter by a specific year
+        }
+        
+        
+        # Send the request using the GraphQL client
+        response = await self.client.request(query, variables, use_apollo=True)
+        
+        # Initialize a list to store the rated media
+        rated_media = []
+
+        # Check the response and process the products
+        if "data" in response and "user" in response["data"]:
+            products = response["data"]["user"]["collection"]["products"]
+            
+            # Iterate over the products and gather media with a rating
+            for product in products:
+                if "otherUserInfos" in product:
+                        user_infos =  product["otherUserInfos"]
+
+                        # Ensure user_info is a dictionary before accessing its fields
+                        if isinstance(user_infos, dict) and 'rating' in user_infos:
+                            if user_infos['rating'] is not None:  # Only consider items with a rating
+                                rated_media.append({
+                                    "id": product["id"],
+                                    "title": product["title"],
+                                    "rating": user_infos["rating"],
+                                    "date_done": user_infos["dateDone"],  # Date the user watched this show
+                                    "universe": product["universe"],  # "movie", "tvshow", etc.
+                                    "category": product["category"],
+                                    "year": product["yearOfProduction"]
+                                })
+                        else:
+                            # Handle cases where user_info is not as expected
+                            print(f"Unexpected user_info format: {user_infos}")
+        
+        return rated_media

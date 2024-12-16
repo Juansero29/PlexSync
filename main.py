@@ -8,16 +8,12 @@ import json
 # Load environment variables
 load_dotenv()
 
-SC_EMAIL = os.getenv("SC_EMAIL")
-SC_PASSWORD = os.getenv("SC_PASSWORD")
-SC_USER_ID = os.getenv("SC_USER_ID")
-
 PLEX_TOKEN = os.getenv("PLEX_TOKEN")
 PLEX_USERNAME = os.getenv("PLEX_USERNAME")
 
 
 # Initialize the SensCritiqueClient
-sc_client = SensCritiqueClient(SC_EMAIL, SC_PASSWORD, SC_USER_ID)
+sc_client = SensCritiqueClient()
 
 # Initialize Plex Client
 plex_client = PlexClient(PLEX_USERNAME, PLEX_TOKEN)
@@ -282,15 +278,29 @@ async def sync_watchlists():
 
     print("Watchlist synchronization complete.")
 
+async def print_plex_user_rated_content():
+    rated_media = plex_client.get_user_rated_content()
+    
+    print(f"All media rated in Plex ({len(rated_media)} items):")
+    for media in rated_media:
+        print(f"{media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
+        
+async def print_sens_critique_user_rated_content():
+    rated_movies = await sc_client.get_user_rated_media(universe="movie")
+    rated_tvShows = await sc_client.get_user_rated_media(universe="tvShow")
+    rated_media = rated_movies + rated_tvShows
+    
+    print(f"All media rated in SensCritique ({len(rated_media)} items):")
+    for media in rated_media:
+        print(f"{media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
+
 async def main():
     # await search_movie_in_sc_diary("Frozen", 2013, "movie")
     # await sync_watchlists()
+    await print_sens_critique_user_rated_content()
+    await print_plex_user_rated_content()
     
-    rated_media = plex_client.get_rated_media()
-    
-    print("All media reted in Plex:")
-    for media in rated_media:
-        print(f"{media['title']} ({media['year']}: {media['rating']}) [{media['id']}]")
+
 
 
 if __name__ == "__main__":

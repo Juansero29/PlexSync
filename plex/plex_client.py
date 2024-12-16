@@ -90,7 +90,7 @@ class PlexClient:
             print(f"Error removing media with Plex ID {plex_media.guid} from watchlist: {e}")
             
     
-    def get_rated_media(self):
+    def get_user_rated_content(self):
         """Retrieve all films, series, and episodes with ratings from Plex."""
         rated_media = []
 
