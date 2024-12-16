@@ -296,7 +296,7 @@ class SensCritiqueClient:
                 print(f"Error fetching date: {e}")
                 return None
 
-    async def get_user_rated_media(self, limit=100, offset=0):
+    async def get_user_rated_media(self, limit=10000, offset=0):
         """Fetch all rated shows, seasons, and episodes from the user's collection."""
         
         # Define the updated query to fetch all rated media (movies, TV shows, seasons, and episodes)
@@ -321,11 +321,16 @@ class SensCritiqueClient:
 
             # Iterate over the products and gather rated media
             for product in products:
+                
+                # If it's not a movie or a tv show, skip
+                if product["universe"] not in [4, 1]:
+                    continue
+                
                 # Check if the product has a rating
                 if product["currentUserInfos"] and product["currentUserInfos"]["rating"] is not None:
                     rated_media.append({
                         "id": product["id"],
-                        "title": product["originalTitle"],
+                        "title": product["originalTitle"] if product["originalTitle"] else product["title"],
                         "rating": product["currentUserInfos"]["rating"],
                         "date_done": product["currentUserInfos"].get("dateDone", None),  # Optional: Date the user watched
                         "type": product["universe"],  # "movie", "tvshow", etc.
@@ -336,11 +341,13 @@ class SensCritiqueClient:
                 # If it's a TV show, check its seasons and episodes for ratings
                 if "seasons" in product and product["seasons"]:
                     for season in product["seasons"]:
+                        season_title = season["originalTitle"] if season["originalTitle"] else season["title"]
                         if season["currentUserInfos"] and season["currentUserInfos"]["rating"] is not None:
                             rated_media.append({
                                 "id": season["id"],
-                                "title": season["title"],
+                                "title": season_title,
                                 "rating": season["currentUserInfos"]["rating"],
+                                "seasonNumber": season["seasonNumber"],
                                 "type": "season",
                                 "category": product["category"],
                                 "year": product["yearOfProduction"]
@@ -350,9 +357,11 @@ class SensCritiqueClient:
                             # Check episodes in this season
                             for episode in season["episodes"]:
                                 if episode["currentUserInfos"] and episode["currentUserInfos"]["rating"] is not None:
+                                    
+                                    episode_title = episode["originalTitle"] if episode["originalTitle"] else episode["title"],
                                     rated_media.append({
                                         "id": episode["id"],
-                                        "title": f"{season['title']} - S{str(season['seasonNumber']).zfill(2)}E{str(episode['episodeNumber']).zfill(2)} - {episode['title']}",
+                                        "title": f"{season_title} - S{str(season['seasonNumber']).zfill(2)}E{str(episode['episodeNumber']).zfill(2)} - {episode_title}",
                                         "rating": episode["currentUserInfos"]["rating"],
                                         "type": "episode",
                                         "category": product["category"],
