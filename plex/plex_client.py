@@ -89,38 +89,38 @@ class PlexClient:
         except Exception as e:
             print(f"Error removing media with Plex ID {plex_media.guid} from watchlist: {e}")
             
-    
     def get_user_rated_content(self):
-        """Retrieve all films, series, and episodes with ratings from Plex."""
+        """Retrieve all films, series, and episodes with ratings from Plex more efficiently."""
         rated_media = []
 
-        # Get all movies
-        movies = self.plex.library.section('Movies').all()
+        # Get all movies with a rating from the 'Movies' section
+        movies_section = self.plex.library.section('Movies')
+        movies = movies_section.search(userRating__exists=True)  # This filters for media with ratings
         for movie in movies:
-            if movie.userRating is not None:  # Only include movies with a rating
-                rated_media.append({
-                    'id': movie.ratingKey,
-                    'title': movie.title,
-                    'year': movie.year,
-                    'type': 'movie',
-                    'rating': movie.userRating
-                })
+            rated_media.append({
+                'id': movie.ratingKey,
+                'title': movie.title,
+                'year': movie.year,
+                'type': 'movie',
+                'rating': movie.userRating
+            })
 
-        # Get all TV Shows
-        tv_shows = self.plex.library.section('TV Shows').all()
+        # Get all TV Shows with a rating from the 'TV Shows' section
+        tv_shows_section = self.plex.library.section('TV Shows')
+        tv_shows = tv_shows_section.search(userRating__exists=True)  # Filter TV Shows with ratings
         for tv_show in tv_shows:
-            if tv_show.userRating is not None:  # Only include TV Shows with a rating
-                rated_media.append({
-                    'id': tv_show.ratingKey,
-                    'title': tv_show.title,
-                    'year': tv_show.year,
-                    'type': 'tvshow',
-                    'rating': tv_show.userRating
-                })
+            rated_media.append({
+                'id': tv_show.ratingKey,
+                'title': tv_show.title,
+                'year': tv_show.year,
+                'type': 'tvshow',
+                'rating': tv_show.userRating
+            })
 
-            # Get all episodes of each TV Show
-            for episode in tv_show.episodes():
-                if episode.userRating is not None:  # Only include episodes with a rating
+            # Get all episodes of each TV Show with a rating
+            episodes = tv_show.episodes()
+            for episode in episodes:
+                if episode.userRating is not None:
                     rated_media.append({
                         'id': episode.ratingKey,
                         'title': f"{tv_show.title} - {episode.title}",

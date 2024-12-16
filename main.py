@@ -297,7 +297,7 @@ async def print_sens_critique_user_rated_content():
 async def main():
     # await search_movie_in_sc_diary("Frozen", 2013, "movie")
     # await sync_watchlists()
-    await print_sens_critique_user_rated_content()
+    # await print_sens_critique_user_rated_content()
     await print_plex_user_rated_content()
     
 
