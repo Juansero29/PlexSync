@@ -284,7 +284,14 @@ async def sync_watchlists():
 
 async def main():
     # await search_movie_in_sc_diary("Frozen", 2013, "movie")
-    await sync_watchlists()
+    # await sync_watchlists()
+    
+    rated_media = plex_client.get_rated_media()
+    
+    print("All media reted in Plex:")
+    for media in rated_media:
+        print(f"{media['title']} ({media['year']}: {media['rating']}) [{media['id']}]")
+
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
