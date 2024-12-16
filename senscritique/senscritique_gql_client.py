@@ -17,11 +17,24 @@ from gql.transport.requests import RequestsHTTPTransport
 from .senscritiqueapp import SensCritiqueApp
 
 
+import os
+from dotenv import load_dotenv
+from plex.plex_client import PlexClient
+import json
+
+# Load environment variables
+load_dotenv()
+
+SC_EMAIL = os.getenv("SC_EMAIL")
+SC_PASSWORD = os.getenv("SC_PASSWORD")
+SC_USER_ID = os.getenv("SC_USER_ID")
+SC_USERNAME = os.getenv("SC_USERNAME")
+
 class SensCritiqueGqlClient(Client):
     def __init__(self, url: str, user_credentials: dict):
         self.user_credentials = user_credentials
         self.id_token = None
-
+        self.apollo_cookie_ref = None
         # Get the Firebase ID Token
         token = self.get_id_token()
 
@@ -96,13 +109,13 @@ class SensCritiqueGqlClient(Client):
         else:
             raise Exception("User credentials are missing")
         
-    async def request(self, document: str, variables: dict = None, use_apollo=False):
+    async def request(self, document: str, variables: dict = None, use_apollo=False, is_signin=False):
         """
         Executes a GraphQL query using the standard request method.
         """
-        return await self.raw_request(document, variables, use_apollo)
+        return await self.raw_request(document, variables, use_apollo, is_signin)
 
-    async def raw_request(self, query, variables=None, use_apollo=False):
+    async def raw_request(self, query, variables=None, use_apollo=False, is_signin=False):
         """Execute a raw GraphQL request with the provided query and variables."""
         if not self.client:
             raise ValueError("GraphQL client is not initialized.")
@@ -110,12 +123,16 @@ class SensCritiqueGqlClient(Client):
         # Determine the appropriate API endpoint
         api_url = "https://apollo.senscritique.com/" if use_apollo else "https://gql.senscritique.com/graphql"
         
+        if use_apollo and not self.apollo_cookie_ref and not is_signin:
+            await self.sign_in_with_email_and_password()
+        
         # Get the Firebase ID Token
-        token = self.get_id_token()
+        token = self.apollo_cookie_ref if use_apollo else self.get_id_token()
 
-        # Check if the token is valid and complete
-        if not token or len(token.split('.')) != 3:
+        if not use_apollo and (not token or len(token.split('.')) != 3):
             raise ValueError("Invalid Firebase ID token. Make sure you're passing the complete JWT.")
+
+
 
         # Prepare the request payload with the Authorization header and User-Agent
         headers = {
@@ -139,3 +156,59 @@ class SensCritiqueGqlClient(Client):
             return response.json()
         else:
             raise ValueError(f"Request failed with status {response.status_code}: {response.text}")
+        
+    async def sign_in_with_email_and_password(self):
+        """Sign in using email and password, store cookieRef for future requests."""
+        
+        # Define the GraphQL mutation for signing in
+        query = """
+        mutation SignInWithEmailAndPasswordMutation($email: String!, $password: String!) {
+          signInWithEmailAndPassword(email: $email, password: $password) {
+            me {
+              email
+              firstName
+              id
+              lastName
+              name
+              username
+              validEmail
+              __typename
+            }
+            userCookie {
+              applicationId
+              cookieRef
+              dateExpiration
+              id
+              userId
+              __typename
+            }
+            __typename
+          }
+        }
+        """
+
+        variables = {
+            "email": SC_EMAIL,
+            "password": SC_PASSWORD
+        }
+
+        # Send the request using the Apollo client
+        response = await self.client.request(query, variables, use_apollo=True, is_signin=True)
+
+        # Check the response
+        if "data" in response and "signInWithEmailAndPassword" in response["data"]:
+            user_cookie = response["data"]["signInWithEmailAndPassword"]["userCookie"]
+            
+            # If the cookieRef is returned, store it
+            if user_cookie and "cookieRef" in user_cookie:
+                self.apollo_cookie_ref = user_cookie["cookieRef"]
+            else:
+                print("Failed to retrieve the cookieRef from the response.")
+                return None
+        else:
+            print("Sign-in failed to SensCritique-Apollo. Please check your credentials.")
+            return None
+
+        # Return the cookieRef for future use
+        return self.apollo_cookie_ref
+

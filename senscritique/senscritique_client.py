@@ -300,7 +300,7 @@ class SensCritiqueClient:
         """Fetch all rated shows, seasons, and episodes from the user's collection."""
         
         # Define the updated query to fetch all rated media (movies, TV shows, seasons, and episodes)
-        query = "query UserCollection($limit: Int, $offset: Int, $username: String!) { user(username: $username) { collection(limit: $limit, offset: $offset) { products { id originalTitle title universe category yearOfProduction currentUserInfos { rating } seasons { universe originalTitle title seasonNumber currentUserInfos { rating } episodes { episodeNumber universe originalTitle title currentUserInfos { rating } } } } } } }"
+        query = "query UserCollection($limit: Int, $offset: Int, $username: String!) { user(username: $username) { collection(limit: $limit, offset: $offset) { products { id originalTitle title universe category yearOfProduction currentUserInfos { rating } seasons { id universe originalTitle title seasonNumber currentUserInfos { rating } episodes { id episodeNumber universe originalTitle title currentUserInfos { rating } } } } } } }"
         
         # Define the variables
         variables = {
