@@ -292,13 +292,13 @@ async def print_sens_critique_user_rated_content():
     
     print(f"All media rated in SensCritique ({len(rated_media)} items):")
     for media in rated_media:
-        print(f"{media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
+        print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
 
 async def main():
     # await search_movie_in_sc_diary("Frozen", 2013, "movie")
     # await sync_watchlists()
     await print_sens_critique_user_rated_content()
-    await print_plex_user_rated_content()
+    # await print_plex_user_rated_content()
 
 
 if __name__ == "__main__":

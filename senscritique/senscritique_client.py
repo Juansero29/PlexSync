@@ -357,7 +357,7 @@ class SensCritiqueClient:
                                     "title": product["title"],
                                     "rating": user_infos["rating"],
                                     "date_done": user_infos["dateDone"],  # Date the user watched this show
-                                    "universe": product["universe"],  # "movie", "tvshow", etc.
+                                    "type": product["universe"],  # "movie", "tvshow", etc.
                                     "category": product["category"],
                                     "year": product["yearOfProduction"]
                                 })
