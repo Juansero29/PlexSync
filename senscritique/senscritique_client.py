@@ -295,74 +295,68 @@ class SensCritiqueClient:
             except Exception as e:
                 print(f"Error fetching date: {e}")
                 return None
-            
-    async def get_user_rated_media(self, limit=100, offset=0, universe=None):
-        """Fetch all rated shows from the user's collection."""
+
+    async def get_user_rated_media(self, limit=100, offset=0):
+        """Fetch all rated shows, seasons, and episodes from the user's collection."""
         
-        query = """
-        query UserDiary($isDiary: Boolean, $limit: Int, $offset: Int, $universe: String, $username: String!, $yearDateDone: Int) {
-          user(username: $username) {
-            collection(isDiary: $isDiary, limit: $limit, offset: $offset, universe: $universe, yearDateDone: $yearDateDone) {
-              products {
-                id
-                universe
-                dateCreation
-                dateLastUpdate
-                category
-                title
-                originalTitle
-                alternativeTitles
-                yearOfProduction
-                url
-                otherUserInfos(username: $username) {
-                  dateDone
-                  rating
-                }
-              }
-            }
-          }
-        }
-        """
+        # Define the updated query to fetch all rated media (movies, TV shows, seasons, and episodes)
+        query = "query UserCollection($limit: Int, $offset: Int, $username: String!) { user(username: $username) { collection(limit: $limit, offset: $offset) { products { id originalTitle title universe category yearOfProduction currentUserInfos { rating } seasons { universe originalTitle title seasonNumber currentUserInfos { rating } episodes { episodeNumber universe originalTitle title currentUserInfos { rating } } } } } } }"
         
+        # Define the variables
         variables = {
-            "isDiary": False,  # Ensures we're fetching all items, not only items marked as 'diary'
             "limit": limit,
             "offset": offset,
-            "universe": universe,  # Optional: could be "movie", "tvshow", etc.
-            "username": SC_USERNAME,
-            "yearDateDone": None  # You can set this to filter by a specific year
+            "username": SC_USERNAME
         }
-        
-        
+
         # Send the request using the GraphQL client
         response = await self.client.request(query, variables, use_apollo=True)
-        
+
         # Initialize a list to store the rated media
         rated_media = []
 
         # Check the response and process the products
         if "data" in response and "user" in response["data"]:
             products = response["data"]["user"]["collection"]["products"]
-            
-            # Iterate over the products and gather media with a rating
-            for product in products:
-                if "otherUserInfos" in product:
-                        user_infos =  product["otherUserInfos"]
 
-                        # Ensure user_info is a dictionary before accessing its fields
-                        if isinstance(user_infos, dict) and 'rating' in user_infos:
-                            if user_infos['rating'] is not None:  # Only consider items with a rating
-                                rated_media.append({
-                                    "id": product["id"],
-                                    "title": product["title"],
-                                    "rating": user_infos["rating"],
-                                    "date_done": user_infos["dateDone"],  # Date the user watched this show
-                                    "type": product["universe"],  # "movie", "tvshow", etc.
-                                    "category": product["category"],
-                                    "year": product["yearOfProduction"]
-                                })
-                        else:
-                            # Handle cases where user_info is not as expected
-                            print(f"Unexpected user_info format: {user_infos}")
+            # Iterate over the products and gather rated media
+            for product in products:
+                # Check if the product has a rating
+                if product["currentUserInfos"] and product["currentUserInfos"]["rating"] is not None:
+                    rated_media.append({
+                        "id": product["id"],
+                        "title": product["originalTitle"],
+                        "rating": product["currentUserInfos"]["rating"],
+                        "date_done": product["currentUserInfos"].get("dateDone", None),  # Optional: Date the user watched
+                        "type": product["universe"],  # "movie", "tvshow", etc.
+                        "category": product["category"],
+                        "year": product["yearOfProduction"]
+                    })
+
+                # If it's a TV show, check its seasons and episodes for ratings
+                if "seasons" in product and product["seasons"]:
+                    for season in product["seasons"]:
+                        if season["currentUserInfos"] and season["currentUserInfos"]["rating"] is not None:
+                            rated_media.append({
+                                "id": season["id"],
+                                "title": season["title"],
+                                "rating": season["currentUserInfos"]["rating"],
+                                "type": "season",
+                                "category": product["category"],
+                                "year": product["yearOfProduction"]
+                            })
+                        
+                        if "episodes" in season and season["episodes"]:
+                            # Check episodes in this season
+                            for episode in season["episodes"]:
+                                if episode["currentUserInfos"] and episode["currentUserInfos"]["rating"] is not None:
+                                    rated_media.append({
+                                        "id": episode["id"],
+                                        "title": f"{season['title']} - S{str(season['seasonNumber']).zfill(2)}E{str(episode['episodeNumber']).zfill(2)} - {episode['title']}",
+                                        "rating": episode["currentUserInfos"]["rating"],
+                                        "type": "episode",
+                                        "category": product["category"],
+                                        "year": product["yearOfProduction"]
+                                    })
         
         return rated_media

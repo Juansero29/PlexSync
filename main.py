@@ -286,10 +286,7 @@ async def print_plex_user_rated_content():
         print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
         
 async def print_sens_critique_user_rated_content():
-    rated_movies = await sc_client.get_user_rated_media(universe="movie")
-    rated_tvShows = await sc_client.get_user_rated_media(universe="tvShow")
-    rated_media = rated_movies + rated_tvShows
-    
+    rated_media = await sc_client.get_user_rated_media()
     print(f"All media rated in SensCritique ({len(rated_media)} items):")
     for media in rated_media:
         print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
