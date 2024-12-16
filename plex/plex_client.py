@@ -14,9 +14,9 @@ PLEX_SERVER_ADDRESS = os.getenv("PLEX_SERVER_ADDRESS")
 load_dotenv()
 
 class PlexClient:
-    def __init__(self, plexUsername, plexToken):
+    def __init__(self):
         """Initialize with an authenticated Plex account."""
-        self.account = MyPlexAccount(plexUsername, token=plexToken)
+        self.account = MyPlexAccount(PLEX_USERNAME, token=PLEX_TOKEN)
         self.plex = PlexServer(PLEX_SERVER_ADDRESS, PLEX_TOKEN)
 
     def search_media_in_plex(self, title, year, content_type):
@@ -33,10 +33,10 @@ class PlexClient:
             # Look for the exact match based on year
             for result in results:
                 if result.year == year:
-                    print(f"Found media: {result.title} ({result.year})")
-                    return result  # Return the media object itself (with ratingKey)
+                    print(f"Found media: {result.title} ({result.year}) with guid: {result.guid}")
 
-            print(f"No exact match found for {title} ({year}).")
+                    return result
+            print(f"No match found for {title} ({year}).")
             return None
 
         except Exception as e:
@@ -174,3 +174,28 @@ class PlexClient:
                 })
 
         return rated_media
+    
+        
+    def rate_media_with_id(self, media, rating):
+        """Rate a media product"""
+        if media:
+            print(f"Media found: {media.title} ({media.year}) with rating {media.ratingKey}")
+
+            # Rate the media item using the rate() method of the plexapi library
+            try:
+                media.rate(rating)
+                
+                # Return the updated information
+                return {
+                    "id": media.ratingKey,
+                    "title": media.title,
+                    "rating": media.rating,
+                    "userRating": media.userRating,
+                    "year": media.year,
+                    "type": media.type
+                }
+            except Exception as e:
+                print(f"Error rating media: {e}")
+        else:
+            print("No media found!")
+            raise ValueError("Media with the given guid not found.")

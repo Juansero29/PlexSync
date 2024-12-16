@@ -369,3 +369,92 @@ class SensCritiqueClient:
                                     })
         
         return rated_media
+
+
+    async def rate_media_with_id(self, media_id, rating):
+            """Rate a media product with a given rating."""
+            
+            # Define the GraphQL mutation
+            query = """
+            mutation ProductRate($productId: Int!, $rating: Int!, $formatId: Int) {
+                productRate(productId: $productId, rating: $rating, formatId: $formatId) {
+                    id
+                    title
+                    currentUserInfos {
+                        dateDone
+                        hasStartedReview
+                        isCurrent
+                        id
+                        isDone
+                        isListed
+                        isRecommended
+                        isReviewed
+                        isWished
+                        productId
+                        rating
+                        userId
+                        numberEpisodeDone
+                        lastEpisodeDone {
+                            episodeNumber
+                            id
+                            season {
+                                seasonNumber
+                                id
+                                episodes {
+                                    title
+                                    id
+                                    episodeNumber
+                                }
+                            }
+                        }
+                        gameSystem {
+                            id
+                            label
+                        }
+                        review {
+                            author {
+                                id
+                                name
+                            }
+                            url
+                        }
+                    }
+                }
+            }
+            """
+            
+            # Prepare the variables for the mutation
+            variables = {
+                "productId": media_id,
+                "rating": rating,
+                "formatId": None  # You can pass a specific formatId if needed
+            }
+
+            # Send the request using your Apollo client
+            response = await self.client.request(query, variables, use_apollo=True)
+            
+            # Process the response to return useful information
+            if "data" in response and "productRate" in response["data"]:
+                product_info = response["data"]["productRate"]
+                rating_info = product_info["currentUserInfos"]
+                
+                print(f"Product {product_info['title']} [{product_info['id']}] has been rated! {rating_info['rating']}/10")
+                
+                # Return the rating and other relevant details
+                return {
+                    "mediaId": product_info["id"],
+                    "rating": rating_info["rating"],
+                    "userId": rating_info["userId"],
+                    "dateDone": rating_info["dateDone"],
+                    "isDone": rating_info["isDone"],
+                    "isListed": rating_info["isListed"],
+                    "isRecommended": rating_info["isRecommended"],
+                    "isReviewed": rating_info["isReviewed"],
+                    "isWished": rating_info["isWished"]
+                }
+                
+            
+            # If the response does not contain the expected data, handle the error
+            else:
+                raise Exception("Failed to rate the media. Response data is missing or malformed.")
+    

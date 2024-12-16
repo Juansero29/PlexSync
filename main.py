@@ -8,15 +8,13 @@ import json
 # Load environment variables
 load_dotenv()
 
-PLEX_TOKEN = os.getenv("PLEX_TOKEN")
-PLEX_USERNAME = os.getenv("PLEX_USERNAME")
 
 
 # Initialize the SensCritiqueClient
 sc_client = SensCritiqueClient()
 
 # Initialize Plex Client
-plex_client = PlexClient(PLEX_USERNAME, PLEX_TOKEN)
+plex_client = PlexClient()
 
 async def add_all_plex_watchlist_to_sc():
     """Sync all items in Plex Watchlist to SensCritique's wishlist."""
@@ -292,11 +290,12 @@ async def print_sens_critique_user_rated_content():
         print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
 
 async def main():
-    # await search_movie_in_sc_diary("Frozen", 2013, "movie")
-    # await sync_watchlists()
-    await print_sens_critique_user_rated_content()
-    # await print_plex_user_rated_content()
 
+    
+    # await sync_watchlists()
+    # await sc_client.rate_media_with_id(85619210, 6)
+    media = plex_client.search_media_in_plex("herbie", 2010, "movie")
+    plex_client.rate_media_with_id(media, 7)
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
