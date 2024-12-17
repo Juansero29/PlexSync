@@ -18,31 +18,9 @@ class PlexClient:
         """Initialize with an authenticated Plex account."""
         self.account = MyPlexAccount(PLEX_USERNAME, token=PLEX_TOKEN)
         self.plex = PlexServer(PLEX_SERVER_ADDRESS, PLEX_TOKEN)
+        self.useruuid = None
 
-    def search_media_in_plex(self, title, year, content_type):
-        """Search for a movie or TV show in Plex's catalog using the searchDiscover method."""
-        try:
-            # Search Plex Discover for the given title and content type
-            results = self.account.searchDiscover(title, libtype=content_type)
-
-            # Check if any results are returned
-            if not results:
-                print(f"No results found for {title} ({year}) in Plex Discover.")
-                return None
-
-            # Look for the exact match based on year
-            for result in results:
-                if result.year == year:
-                    print(f"Found media: {result.title} ({result.year}) with guid: {result.guid}")
-
-                    return result
-            print(f"No match found for {title} ({year}).")
-            return None
-
-        except Exception as e:
-            print(f"Error searching for {title} ({year}) in Plex Discover: {e}")
-            return None
-
+  
     def add_to_plex_watchlist(self, plex_media):
         """Add a movie or TV show to the Plex watchlist using its media object."""
         try:
@@ -92,91 +70,138 @@ class PlexClient:
             print(f"Error removing media with Plex ID {plex_media.guid} from watchlist: {e}")
             
     def get_user_rated_content(self):
-        """Retrieve all films, series, and episodes with ratings from Plex."""
-        rated_media = []
+            """Retrieve all films, series, seasons, and episodes with ratings from Plex Discover."""
+            rated_media = []
+            end_cursor = None  # To manage pagination
 
-        # Step 1: Search for rated movies
-        movies = self.plex.library.section('Movies').search(userRating__exists=True)  # Search for movies with a rating
-        for movie in movies:
-            rated_media.append({
-                'id': movie.ratingKey,
-                'title': movie.title,
-                'year': movie.year,
-                'type': 'movie',
-                'rating': movie.userRating
-            })
+            headers = {
+                "Host": "community.plex.tv",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Plex-Token": PLEX_TOKEN
+            }
+
+            graphql_query = """
+                    query GetReviewsHub($uuid: ID = "", $first: PaginationInt!, $after: String) {
+                    user(id: $uuid) {
+                        reviews(first: $first, after: $after) {
+                        nodes {
+                            ... on ActivityRating {
+                            ...ActivityRatingFragment
+                            }
+                            ... on ActivityWatchRating {
+                            ...ActivityWatchRatingFragment
+                            }
+                        }
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        }
+                    }
+                    }
+                    fragment ActivityRatingFragment on ActivityRating {
+                    id
+                    rating
+                    metadataItem {
+                        title
+                        type
+                        year
+                        index
+                        key
+                        parent {
+                        title
+                        index
+                        }
+                        grandparent {
+                        title
+                        index
+                        }
+                    }
+                    }
+                    fragment ActivityWatchRatingFragment on ActivityWatchRating {
+                    id
+                    rating
+                    metadataItem {
+                        title
+                        type
+                        year
+                        index
+                        key
+                        parent {
+                        title
+                        index
+                        }
+                        grandparent {
+                        title
+                        index
+                        }
+                    }
+                    }
+                    """
             
-        # Step 2: Search for rated TV Shows
-        tv_shows = self.plex.library.section('TV Shows').search(userRating__exists=True) 
-        for tv_show in tv_shows:
-            if tv_show.userRating is not None:  # If the TV show itself has a rating
-                rated_media.append({
-                    'id': tv_show.ratingKey,
-                    'title': tv_show.title,
-                    'year': tv_show.year,
-                    'type': 'tvshow',
-                    'rating': tv_show.userRating
-                })
-
-        # Step 2.5: Fetch rated seasons using HTTP request
-        url = f"{PLEX_SERVER_ADDRESS}/library/sections/1/all?type=3&userRating>=1&X-Plex-Token={PLEX_TOKEN}"  # Type 2 for seasons
-        response = requests.get(url)
-
-        if response.status_code == 200:
-            # Parse the XML response for rated seasons
-            tree = ElementTree.fromstring(response.content)
+            user_uuid = self.get_user_id_by_username(PLEX_USERNAME)
             
-            # Find all season elements (Season videos)
-            seasons = tree.findall(".//Directory")
-            
-            for season in seasons:
-                title = season.get("title")
-                year = season.get("year")
-                rating = season.get("userRating")
-                rating_key = season.get("ratingKey")
-                season_index = season.get("index")
-                parent_show_title = season.get("parentTitle", "Unknown TV Show")  # Fetch parent show title
-                
-                rated_media.append({
-                    'id': rating_key,
-                    'title': f"{parent_show_title} - S{str(season_index).zfill(2)}",
-                    'year': year,
-                    'type': 'season',
-                    'rating': rating
-                })
+            while True:
+                payload = {
+                    "query": graphql_query,
+                    "variables": {
+                        "uuid": user_uuid,
+                        "first": 100, 
+                        "after": end_cursor
+                    },
+                    "operationName": "GetReviewsHub"
+                }
 
-        # Step 3: Fetch rated episodes using HTTP request
-        url = f"{PLEX_SERVER_ADDRESS}/library/sections/1/all?type=4&userRating>=1&X-Plex-Token={PLEX_TOKEN}"
-        response = requests.get(url)
+                response = requests.post("https://community.plex.tv/api", headers=headers, json=payload)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    nodes = data.get("data", {}).get("user", {}).get("reviews", {}).get("nodes", [])
+                    page_info = data.get("data", {}).get("user", {}).get("reviews", {}).get("pageInfo", {})
+                    end_cursor = page_info.get("endCursor")
+                    has_next_page = page_info.get("hasNextPage")
+
+                    # Parse nodes
+                    for node in nodes:
+                        metadata = node.get("metadataItem", {})
+                        rating = node.get("rating")
+                        if metadata and rating:
+                            item_type = metadata.get("type")  # EPISODE, SEASON, SHOW, MOVIE
+                            title = metadata.get("title")
+                            year = metadata.get("year")
+                            key = metadata.get("key")
+                            item = {
+                                "id": key,
+                                "title": title,
+                                "type": item_type,
+                                "year": year,
+                                "rating": rating
+                            }
+
+                            # Handle specific formatting for episodes and seasons
+                            if item_type == "EPISODE":
+                                parent = metadata.get("parent", {})
+                                grandparent = metadata.get("grandparent", {})
+                                season = parent.get("index")
+                                episode = metadata.get("index")
+                                item["title"] = f"{grandparent.get('title', 'Unknown Show')} - S{str(season).zfill(2)}E{str(episode).zfill(2)} - {title}"
+                            elif item_type == "SEASON":
+                                parent = metadata.get("parent", {})
+                                item["title"] = f"{parent.get('title', 'Unknown Show')} - Season {metadata.get('index')}"
+
+                            rated_media.append(item)
+
+                    # Break the loop if no more pages
+                    if not has_next_page:
+                        break
+                else:
+                    print(f"Failed to fetch rated content. Status: {response.status_code}, Response: {response.text}")
+                    break
+
+            return rated_media
         
-        if response.status_code == 200:
-            # Parse the XML response for rated episodes
-            tree = ElementTree.fromstring(response.content)
-            
-            # Find all episode elements (Video elements)
-            episodes = tree.findall(".//Video")
-            
-            for episode in episodes:
-                title = episode.get("title")
-                year = episode.get("year")
-                rating = episode.get("userRating")
-                rating_key = episode.get("ratingKey")
-                season = episode.get("parentIndex")
-                episode_index = episode.get("index")
-                parent_show_title = episode.get("grandparentTitle", "Unknown TV Show")  # Fetch parent show title
-                
-                rated_media.append({
-                    'id': rating_key,
-                    'title': f"{parent_show_title} - S{str(season).zfill(2)}E{str(episode_index).zfill(2)} - {title}",
-                    'year': year,
-                    'type': 'episode',
-                    'rating': rating
-                })
-
-        return rated_media
-    
-        
-    def rate_media_with_id(self, media, rating):
+    def rate_media_with_ratingKey(self, media, rating):
         """Rate a media product"""
         if media:
             print(f"Media found: {media.title} ({media.year}) with rating {media.ratingKey}")
@@ -199,3 +224,302 @@ class PlexClient:
         else:
             print("No media found!")
             raise ValueError("Media with the given guid not found.")
+
+    def search_media_in_plex(self, title, year, content_type):
+        """
+        Search for any media in Plex globally, including those not in the server.
+
+        Args:
+            title (str): The title of the media to search for.
+            year (int): The year of the media.
+            content_type (str): The type of content ('movie' or 'show').
+
+        Returns:
+            dict: A dictionary representing the detailed media metadata with the ratingKey, or None if not found.
+        """
+        try:
+            # Perform global search using searchDiscover
+            results = self.account.searchDiscover(title, libtype=content_type)
+
+            if not results:
+                print(f"No results found for {title} ({year}) in Plex Discover.")
+                return None
+
+            # Look for the exact match based on year
+            for result in results:
+                if (year and result.year == year) or not year:
+                    # Fetch detailed metadata to get the ratingKey
+                    url = f"https://metadata.provider.plex.tv{result.key}"
+                    params = {"X-Plex-Token": PLEX_TOKEN}
+                    response = requests.get(url, params=params)
+
+                    if response.status_code == 200:
+                        tree = ElementTree.fromstring(response.text)
+                        
+                        video = tree.find(".//Video")
+                        ratingKey = video.get("ratingKey")
+                        
+                        if ratingKey:
+                            return {
+                                "title": result.title,
+                                "year": result.year,
+                                "ratingKey": ratingKey
+                            }
+                    else:
+                        print(f"Failed to fetch global metadata. Status code: {response.status_code}")
+                        
+            print(f"No match found for {title} ({year}).")
+            return None
+
+        except Exception as e:
+            print(f"Error searching for {title} ({year}) in Plex Discover: {e}")
+            return None
+        
+    def search_media_in_server(self, title, year, content_type):
+        """
+        Search for media in Plex based on title, year, and content type.
+
+        Args:
+            title (str): The title of the media to search for.
+            year (int): The year of the media.
+            content_type (str): The type of content ('movie' or 'show').
+
+        Returns:
+            plexapi.video.Video or None: The matching media object, or None if not found.
+        """
+        try:
+            libraries = self.plex.library.sections()
+            for library in libraries:
+                if library.type in ['movie', 'show']:
+                    results = library.search(title=title)
+
+                    for media in results:
+                        if media.title.lower() == title.lower() and media.year == year:
+                            return media
+
+            return None
+
+        except Exception as e:
+            print(f"Error searching for media: {e}")
+            return None
+
+
+    def rate_media(self, ratingKey, rating):
+        """
+        Rate a globally searched media item using its metadata ID.
+
+        Args:
+            ratingKey (str): The metadata ID (key) of the media to rate.
+            rating (int): The rating value (1 to 10).
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        try:
+            # API endpoint for rating
+            url = "https://discover.provider.plex.tv/actions/rate"
+
+            # Headers for the request
+            headers = {
+                "Host": "discover.provider.plex.tv",
+                "Accept": "application/json",
+                "X-Plex-Token": PLEX_TOKEN
+            }
+
+            # Query parameters
+            params = {
+                "identifier": "tv.plex.provider.discover",
+                "key": ratingKey,
+                "rating": rating
+            }
+
+            # Send PUT request
+            response = requests.put(url, headers=headers, params=params)
+
+            # Check response status
+            if response.status_code == 200:
+                print(f"Successfully rated media with ID {ratingKey} as {rating} stars.")
+                return True
+            else:
+                print(f"Failed to rate media. Status code: {response.status_code}, Response: {response.text}")
+                return False
+
+        except Exception as e:
+            print(f"Error rating global media: {e}")
+            return False
+
+    def search_and_rate_media(self, title, year, content_type, rating):
+        """
+        Search for media locally and globally, then rate it.
+
+        Args:
+            title (str): The title of the media to search for.
+            year (int): The year of the media.
+            content_type (str): The type of content ('movie' or 'show').
+            rating (int): The rating value (1 to 10).
+
+        Returns:
+            None
+        """
+        # Try searching locally
+        media = self.search_media_in_server(title, year, content_type)
+
+        if media:
+            print(f"Found media locally: {media.title} ({media.year})")
+            self.rate_media(media.ratingKey, rating)
+        else:
+            print("Media not found in local server. Searching globally...")
+            result = self.search_media_in_plex(title, year, content_type)
+
+            if result:
+                print(f"Found media: {result['title']} ({result['year']})")
+                
+                
+                metadata_id = result['ratingKey']
+                # Example: Rate the first result
+                self.rate_media(metadata_id, rating)
+
+
+            else:
+                print("No results found globally.")
+
+    def get_user_id_by_username(self, username):
+        """
+        Retrieve the Plex user ID based on the username.
+        
+        Args:
+            username (str): The Plex username to look up.
+        
+        Returns:
+            str: The user ID if found, None otherwise.
+        """
+        
+        if self.useruuid:
+            return self.useruuid
+        
+        headers = {
+            "Host": "community.plex.tv",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Plex-Token": PLEX_TOKEN
+        }
+
+        graphql_query = """
+        query GetUserDetails($username: ID!) {
+          userByUsername(username: $username) {
+            id
+            avatar
+            username
+            displayName
+          }
+        }
+        """
+
+        payload = {
+            "query": graphql_query,
+            "variables": {
+                "username": username
+            },
+            "operationName": "GetUserDetails"
+        }
+
+        # Send the request
+        response = requests.post("https://community.plex.tv/api", headers=headers, json=payload)
+
+        if response.status_code == 200:
+            data = response.json()
+            user_data = data.get("data", {}).get("userByUsername")
+            if user_data:
+                print(f"User '{username}' found. ID: {user_data['id']}")
+                self.useruuid = user_data["id"]
+                return self.useruuid
+            else:
+                print(f"User '{username}' not found.")
+                return None
+        else:
+            print(f"Failed to fetch user ID. Status: {response.status_code}, Response: {response.text}")
+            return None
+
+    def get_user_rated_content_in_local_plex_server(self):
+            """Retrieve all films, series, and episodes with ratings from Plex."""
+            rated_media = []
+
+            # Step 1: Search for rated movies
+            movies = self.plex.library.section('Movies').search(userRating__exists=True)  # Search for movies with a rating
+            for movie in movies:
+                rated_media.append({
+                    'id': movie.ratingKey,
+                    'title': movie.title,
+                    'year': movie.year,
+                    'type': 'movie',
+                    'rating': movie.userRating
+                })
+                
+            # Step 2: Search for rated TV Shows
+            tv_shows = self.plex.library.section('TV Shows').search(userRating__exists=True) 
+            for tv_show in tv_shows:
+                if tv_show.userRating is not None:  # If the TV show itself has a rating
+                    rated_media.append({
+                        'id': tv_show.ratingKey,
+                        'title': tv_show.title,
+                        'year': tv_show.year,
+                        'type': 'tvshow',
+                        'rating': tv_show.userRating
+                    })
+
+            # Step 2.5: Fetch rated seasons using HTTP request
+            url = f"{PLEX_SERVER_ADDRESS}/library/sections/1/all?type=3&userRating>=1&X-Plex-Token={PLEX_TOKEN}"  # Type 2 for seasons
+            response = requests.get(url)
+
+            if response.status_code == 200:
+                # Parse the XML response for rated seasons
+                tree = ElementTree.fromstring(response.content)
+                
+                # Find all season elements (Season videos)
+                seasons = tree.findall(".//Directory")
+                
+                for season in seasons:
+                    title = season.get("title")
+                    year = season.get("year")
+                    rating = season.get("userRating")
+                    rating_key = season.get("ratingKey")
+                    season_index = season.get("index")
+                    parent_show_title = season.get("parentTitle", "Unknown TV Show")  # Fetch parent show title
+                    
+                    rated_media.append({
+                        'id': rating_key,
+                        'title': f"{parent_show_title} - S{str(season_index).zfill(2)}",
+                        'year': year,
+                        'type': 'season',
+                        'rating': rating
+                    })
+
+            # Step 3: Fetch rated episodes using HTTP request
+            url = f"{PLEX_SERVER_ADDRESS}/library/sections/1/all?type=4&userRating>=1&X-Plex-Token={PLEX_TOKEN}"
+            response = requests.get(url)
+            
+            if response.status_code == 200:
+                # Parse the XML response for rated episodes
+                tree = ElementTree.fromstring(response.content)
+                
+                # Find all episode elements (Video elements)
+                episodes = tree.findall(".//Video")
+                
+                for episode in episodes:
+                    title = episode.get("title")
+                    year = episode.get("year")
+                    rating = episode.get("userRating")
+                    rating_key = episode.get("ratingKey")
+                    season = episode.get("parentIndex")
+                    episode_index = episode.get("index")
+                    parent_show_title = episode.get("grandparentTitle", "Unknown TV Show")  # Fetch parent show title
+                    
+                    rated_media.append({
+                        'id': rating_key,
+                        'title': f"{parent_show_title} - S{str(season).zfill(2)}E{str(episode_index).zfill(2)} - {title}",
+                        'year': year,
+                        'type': 'episode',
+                        'rating': rating
+                    })
+
+            return rated_media

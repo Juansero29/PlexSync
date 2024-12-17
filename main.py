@@ -63,7 +63,7 @@ async def add_all_scs_wishlist_to_plex():
         print(f"Searching for '{title}' ({year}) in Plex...")
 
         # Search for the movie/series in Plex
-        plex_media = plex_client.search_media_in_plex(title, year, content_type=universe)
+        plex_media = plex_client.search_media_in_discover(title, year, content_type=universe)
 
         if plex_media:
             print(f"Adding '{title}' ({year}) to Plex watchlist...")
@@ -120,7 +120,7 @@ async def remove_sc_wishlist_removed_items_in_plex():
         print(f"Found {len(items_to_remove_from_plex)} items to remove from Plex Watchlist.")
         for sc_media in items_to_remove_from_plex:
             # Search the media on Plex by title, year, and type (universe)
-            plex_media = plex_client.search_media_in_plex(sc_media[0], sc_media[1], content_type=sc_media[2])
+            plex_media = plex_client.search_media_in_discover(sc_media[0], sc_media[1], content_type=sc_media[2])
             if plex_media:
                 print(f"Removing {sc_media[0]} ({sc_media[1]}) from Plex Watchlist...")
                 plex_client.remove_from_plex_watchlist(plex_media)
@@ -138,7 +138,7 @@ async def add_media_to_all_services_watchlist(title, year, type):
         await sc_client.fetch_user_wishes()
 
         print(f"\nSearching for media from {year} on Plex...")
-        plex_media = plex_client.search_media_in_plex(title, year, content_type=type)
+        plex_media = plex_client.search_media_in_discover(title, year, content_type=type)
 
         if plex_media:
             plex_client.add_to_plex_watchlist(plex_media)
@@ -228,7 +228,7 @@ async def sync_watchlists():
         sync_entry = find_sync_entry(sync_data, plex_id=None, sc_id=sc_media["id"])
         if not sync_entry:
             print(f"Adding '{title}' ({year}) to Plex watchlist...")
-            plex_media = plex_client.search_media_in_plex(title, year, content_type=media_type)
+            plex_media = plex_client.search_media_in_discover(title, year, content_type=media_type)
             if plex_media:
                 plex_client.add_to_plex_watchlist(plex_media)
                 # Update the sync data after adding it to Plex
@@ -259,7 +259,7 @@ async def sync_watchlists():
             # If it's missing from SensCritique, remove it from Plex (because it was removed from SensCritique)
             elif not sc_wishlist or not any(s["title"] == title and s["release_date"].year == year and s["universe"] == media_type for s in sc_wishlist):
                 print(f"Removing '{title}' ({year}) from Plex watchlist... (SensCritique removed it)")
-                plex_media = plex_client.search_media_in_plex(title, year, content_type=media_type)
+                plex_media = plex_client.search_media_in_discover(title, year, content_type=media_type)
                 if plex_media:
                     plex_client.remove_from_plex_watchlist(plex_media)
                 # Update the sync status
@@ -290,12 +290,12 @@ async def print_sens_critique_user_rated_content():
         print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}]")
 
 async def main():
-
-    
     # await sync_watchlists()
     # await sc_client.rate_media_with_id(85619210, 6)
-    media = plex_client.search_media_in_plex("herbie", 2010, "movie")
-    plex_client.rate_media_with_id(media, 7)
+    
+    # plex_client.search_and_rate_media("les tontons flingueurs", 1963, "movie", 4)
+    
+    await print_plex_user_rated_content()
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
