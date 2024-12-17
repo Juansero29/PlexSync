@@ -295,13 +295,13 @@ async def sync_ratings():
     
     # Step 2: Convert SensCritique items to a set for faster comparison
     sc_rated_set = {
-        (item["title"].lower(), item["year"], item["type"]): item["rating"]
+        (item["title"].lower(), item["year"]): item["rating"]
         for item in sens_critique_rated_items
     }
 
-    # vb vb Step 3: Sync Plex ratings to SensCritique
+    # Step 3: Sync Plex ratings to SensCritique
     for item in plex_rated_items:
-        key = (item["title"].lower(), item["year"], item["type"])
+        key = (item["title"].lower(), item["year"])
         if key not in sc_rated_set or sc_rated_set[key] != item["rating"]:
             print(f"Rating '{item['title']}' ({item['year']}) in SensCritique with {item['rating']} stars.")
             await sc_client.search_and_rate_media(
@@ -312,7 +312,7 @@ async def sync_ratings():
 
     # Step 4: Convert Plex items to a set for faster comparison
     plex_rated_set = {
-        (item["title"].lower(), item["year"], item["type"]): item["rating"]
+        (item["title"].lower(), item["year"]): item["rating"]
         for item in plex_rated_items
     }
 
@@ -329,7 +329,6 @@ async def sync_ratings():
 
 
     print("Ratings synchronization completed.")
-
 
 async def main():
     # await sync_watchlists()

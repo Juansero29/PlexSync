@@ -40,7 +40,17 @@ class SensCritiqueClient:
             parsed_date = datetime.strptime(english_date, "%d %B %Y")
             return parsed_date
         except Exception as e:
-            print(f"Failed to parse using strptime: {e}")
+            
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y")
+                return parsed_date
+            except Exception as e:
+                try:
+                    parsed_date = datetime.strptime(date_str, "%B %Y")
+                    return parsed_date
+                except Exception as e:
+                    print(f"Failed to parse using strptime for french date {date_str}: {e}")
+
 
     async def fetch_user_wishes(self, limit=30):
         """Fetch the wishlist of the authenticated user."""
@@ -123,25 +133,13 @@ class SensCritiqueClient:
         else:
             return None
     
-    def get_media_type_from_type_id(self, mediaTypeid):
-        media_type_mapping = {
-            1: "movie",
-            4: "show",
-            5: "season",
-            32: "episode"
-        }
-
-        # Return the mapped value or None if mediaTypeid is not found
-        media_type = media_type_mapping.get(mediaTypeid, None)
-        return media_type
-    
     async def fetch_media(self, title, year, universe): 
         """Fetch media by title, year, and universe."""
         
         # Updated GraphQL query to fetch additional details like genres, release_date, universe, and picture
         query = """
         query SearchMedia($keywords: String!, $universe: String) {
-            searchResult(keywords: $keywords, universe: $universe, limit: 5) {
+            searchResult(keywords: $keywords, universe: $universe, limit: 50) {
                 results {
                     products_list {
                         id
@@ -170,10 +168,12 @@ class SensCritiqueClient:
                 for product in products_list:
                     
                     
+                    if product["universe"] != self.get_sc_text_media_type_from_sc_id(universe):
+                        continue
+                    
                     # Check if the 'year_of_production' matches
-                    if product["year_of_production"] == year:
+                    if product["year_of_production"] == year or str(year) in product["title"]:
                         print(f"Found media: {product['title']} ({product['year_of_production']})")
-                        print(f"Genres: {', '.join(product.get('genres', []))}")
                         print(f"Release Date: {product.get('release_date', 'Unknown')}")
                         print(f"Universe: {product.get('universe', 'Unknown')}")
                         picture = product["medias"].get("picture", "No picture available")
@@ -345,7 +345,7 @@ class SensCritiqueClient:
                         "id": product["id"],
                         "title": product["originalTitle"] if product["originalTitle"] else product["title"],
                         "rating": product["currentUserInfos"]["rating"],
-                        "type": self.get_media_type_from_type_id(product["universe"]),  # "movie", "tvshow", etc.
+                        "type": self.get_plex_media_type_from_sc_id(product["universe"]),  # "movie", "tvshow", etc.
                         "category": product["category"],
                         "year": product["yearOfProduction"],
                         "ratedDate": product["currentUserInfos"]["dateDone"]
@@ -486,11 +486,47 @@ class SensCritiqueClient:
         Returns:
             None
         """
-        # Try searching locally
-        media = await self.fetch_media(title, year, content_type)
+        media = await self.fetch_media(title, year, self.get_sc_media_type_from_plex_type(content_type))
 
         if media:
             print(f"Found media match in SensCritique: {media['title']} ({media['year_of_production']})")
             await self.rate_media_with_id(media['id'], rating)
         else:
                 print(f"No results found for {title} ({year}) [{content_type}].")
+
+    def get_plex_media_type_from_sc_id(self, mediaTypeid):
+        media_type_mapping = {
+            1: "movie",
+            4: "show",
+            5: "season",
+            32: "episode"
+        }
+
+        # Return the mapped value or None if mediaTypeid is not found
+        media_type = media_type_mapping.get(mediaTypeid, None)
+        return media_type
+
+    def get_sc_media_type_from_plex_type(self, mediaTypeid):
+        media_type_mapping = {
+            "movie": 1,
+            "show": 4,
+            "season": 5,
+            "episode": 32 
+        }
+
+        # Return the mapped value or None if mediaTypeid is not found
+        media_type = media_type_mapping.get(mediaTypeid, None)
+        return media_type
+    
+    def get_sc_text_media_type_from_sc_id(self, mediaTypeid):
+        media_type_mapping = {
+            1: "movie",
+            4: "show",
+            5: "season",
+            32: "episode"
+        }
+
+        # Return the mapped value or None if mediaTypeid is not found
+        media_type = media_type_mapping.get(mediaTypeid, None)
+        return media_type
+    
