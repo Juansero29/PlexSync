@@ -102,6 +102,7 @@ class PlexClient:
                     }
                     fragment ActivityRatingFragment on ActivityRating {
                     id
+                    date
                     rating
                     metadataItem {
                         title
@@ -121,6 +122,7 @@ class PlexClient:
                     }
                     fragment ActivityWatchRatingFragment on ActivityWatchRating {
                     id
+                    date
                     rating
                     metadataItem {
                         title
@@ -166,6 +168,7 @@ class PlexClient:
                     for node in nodes:
                         metadata = node.get("metadataItem", {})
                         rating = node.get("rating")
+                        ratedDate = node.get("date")
                         if metadata and rating:
                             item_type = metadata.get("type")  # EPISODE, SEASON, SHOW, MOVIE
                             title = metadata.get("title")
@@ -176,7 +179,8 @@ class PlexClient:
                                 "title": title,
                                 "type": item_type,
                                 "year": year,
-                                "rating": rating
+                                "rating": rating,
+                                "ratedDate": ratedDate
                             }
 
                             # Handle specific formatting for episodes and seasons
@@ -200,7 +204,9 @@ class PlexClient:
                     break
 
             return rated_media
-        
+    
+
+                    
     def rate_media_with_ratingKey(self, media, rating):
         """Rate a media product"""
         if media:
@@ -257,7 +263,14 @@ class PlexClient:
                         tree = ElementTree.fromstring(response.text)
                         
                         video = tree.find(".//Video")
-                        ratingKey = video.get("ratingKey")
+                        ratingKey = None
+                        
+                        if video:
+                            ratingKey = video.get("ratingKey")
+                        else:
+                            directory = tree.find(".//Directory")
+                            ratingKey = directory.get("ratingKey")
+                            
                         
                         if ratingKey:
                             return {
@@ -361,28 +374,19 @@ class PlexClient:
         Returns:
             None
         """
-        # Try searching locally
-        media = self.search_media_in_server(title, year, content_type)
+        result = self.search_media_in_plex(title, year, content_type)
 
-        if media:
-            print(f"Found media locally: {media.title} ({media.year})")
-            self.rate_media(media.ratingKey, rating)
+        if result:
+            print(f"Found media: {result['title']} ({result['year']})")
+
+            metadata_id = result['ratingKey']
+            # Example: Rate the first result
+            self.rate_media(metadata_id, rating)
+
         else:
-            print("Media not found in local server. Searching globally...")
-            result = self.search_media_in_plex(title, year, content_type)
+            print(f"No results found for {title} ({year}) [{content_type}]")
 
-            if result:
-                print(f"Found media: {result['title']} ({result['year']})")
-                
-                
-                metadata_id = result['ratingKey']
-                # Example: Rate the first result
-                self.rate_media(metadata_id, rating)
-
-
-            else:
-                print("No results found globally.")
-
+    
     def get_user_id_by_username(self, username):
         """
         Retrieve the Plex user ID based on the username.

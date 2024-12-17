@@ -122,7 +122,19 @@ class SensCritiqueClient:
             return media["id"]
         else:
             return None
-        
+    
+    def get_media_type_from_type_id(self, mediaTypeid):
+        media_type_mapping = {
+            1: "movie",
+            4: "show",
+            5: "season",
+            32: "episode"
+        }
+
+        # Return the mapped value or None if mediaTypeid is not found
+        media_type = media_type_mapping.get(mediaTypeid, None)
+        return media_type
+    
     async def fetch_media(self, title, year, universe): 
         """Fetch media by title, year, and universe."""
         
@@ -156,6 +168,8 @@ class SensCritiqueClient:
             for result in results:
                 products_list = result.get("products_list", [])
                 for product in products_list:
+                    
+                    
                     # Check if the 'year_of_production' matches
                     if product["year_of_production"] == year:
                         print(f"Found media: {product['title']} ({product['year_of_production']})")
@@ -182,7 +196,6 @@ class SensCritiqueClient:
                                 return product
                         except ValueError:
                             print(f"Could not parse release date: {release_date}")
-
         print(f"No media found for '{title}' ({year}) in SensCritique")
         return None
 
@@ -300,7 +313,7 @@ class SensCritiqueClient:
         """Fetch all rated shows, seasons, and episodes from the user's collection."""
         
         # Define the updated query to fetch all rated media (movies, TV shows, seasons, and episodes)
-        query = "query UserCollection($limit: Int, $offset: Int, $username: String!) { user(username: $username) { collection(limit: $limit, offset: $offset) { products { id originalTitle title universe category yearOfProduction currentUserInfos { rating } seasons { id universe originalTitle title seasonNumber currentUserInfos { rating } episodes { id episodeNumber universe originalTitle title currentUserInfos { rating } } } } } } }"
+        query = "query UserCollection($limit: Int, $offset: Int, $username: String!) { user(username: $username) { collection(limit: $limit, offset: $offset) { products { id originalTitle title universe category yearOfProduction currentUserInfos { rating dateDone } seasons { id universe originalTitle title seasonNumber currentUserInfos { rating dateDone } episodes { id episodeNumber universe originalTitle title currentUserInfos { rating dateDone } } } } } } }"
         
         # Define the variables
         variables = {
@@ -332,10 +345,10 @@ class SensCritiqueClient:
                         "id": product["id"],
                         "title": product["originalTitle"] if product["originalTitle"] else product["title"],
                         "rating": product["currentUserInfos"]["rating"],
-                        "date_done": product["currentUserInfos"].get("dateDone", None),  # Optional: Date the user watched
-                        "type": product["universe"],  # "movie", "tvshow", etc.
+                        "type": self.get_media_type_from_type_id(product["universe"]),  # "movie", "tvshow", etc.
                         "category": product["category"],
-                        "year": product["yearOfProduction"]
+                        "year": product["yearOfProduction"],
+                        "ratedDate": product["currentUserInfos"]["dateDone"]
                     })
 
                 # If it's a TV show, check its seasons and episodes for ratings
@@ -350,7 +363,8 @@ class SensCritiqueClient:
                                 "seasonNumber": season["seasonNumber"],
                                 "type": "season",
                                 "category": product["category"],
-                                "year": product["yearOfProduction"]
+                                "year": product["yearOfProduction"],
+                                "ratedDate": product["currentUserInfos"]["dateDone"]
                             })
                         
                         if "episodes" in season and season["episodes"]:
@@ -365,7 +379,8 @@ class SensCritiqueClient:
                                         "rating": episode["currentUserInfos"]["rating"],
                                         "type": "episode",
                                         "category": product["category"],
-                                        "year": product["yearOfProduction"]
+                                        "year": product["yearOfProduction"],
+                                        "ratedDate": product["currentUserInfos"]["dateDone"]
                                     })
         
         return rated_media
@@ -457,4 +472,25 @@ class SensCritiqueClient:
             # If the response does not contain the expected data, handle the error
             else:
                 raise Exception("Failed to rate the media. Response data is missing or malformed.")
-    
+
+    async def search_and_rate_media(self, title, year, content_type, rating):
+        """
+        Search for media locally and globally, then rate it.
+
+        Args:
+            title (str): The title of the media to search for.
+            year (int): The year of the media.
+            content_type (str): The type of content ('movie' or 'show').
+            rating (int): The rating value (1 to 10).
+
+        Returns:
+            None
+        """
+        # Try searching locally
+        media = await self.fetch_media(title, year, content_type)
+
+        if media:
+            print(f"Found media match in SensCritique: {media['title']} ({media['year_of_production']})")
+            await self.rate_media_with_id(media['id'], rating)
+        else:
+                print(f"No results found for {title} ({year}) [{content_type}].")
