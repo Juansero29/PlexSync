@@ -5,7 +5,7 @@ import asyncio
 from dotenv import load_dotenv
 from plex.plex_client import PlexClient
 import json
-
+import re
 # Load environment variables
 load_dotenv()
 
@@ -133,7 +133,17 @@ class SensCritiqueClient:
         else:
             return None
     
-    async def fetch_media(self, title, year, universe): 
+    async def fetch_media(self, title, year, universe):
+        if universe == 1 or universe == 4:
+            return await self.fetch_media_tvShow_or_movie(title, year, universe)
+        if universe == 32:
+            return await self.fetch_episode(title, year)
+            
+        if universe == 5:
+            return await self.fetch_season(title, year)
+            
+    
+    async def fetch_media_tvShow_or_movie(self, title, year, universe): 
         """Fetch media by title, year, and universe."""
         
         # Updated GraphQL query to fetch additional details like genres, release_date, universe, and picture
@@ -198,6 +208,288 @@ class SensCritiqueClient:
                             print(f"Could not parse release date: {release_date}")
         print(f"No media found for '{title}' ({year}) in SensCritique")
         return None
+
+    async def fetch_media_tvShow_or_movie_by_name(self, title, universe): 
+            """Fetch media by title, year, and universe."""
+            
+            # Updated GraphQL query to fetch additional details like genres, release_date, universe, and picture
+            query = """
+            query SearchMedia($keywords: String!, $universe: String) {
+                searchResult(keywords: $keywords, universe: $universe, limit: 50) {
+                    results {
+                        products_list {
+                            id
+                            title
+                            original_title
+                            year_of_production
+                            genres
+                            release_date
+                            universe
+                            medias(pictureSize: "150") {
+                                picture
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            
+            variables = {"keywords": title, "universe": universe}
+            response = await self.client.request(query, variables)
+
+            # Ensure we are checking the 'data' key
+            if "data" in response and "searchResult" in response["data"]:
+                results = response["data"]["searchResult"]["results"]
+                for result in results:
+                    products_list = result.get("products_list", [])
+                    for product in products_list:
+                        
+                        text_universe = self.get_sc_text_media_type_from_sc_id(universe)
+                        
+                        if product["universe"] != text_universe:
+                            continue
+                        
+                        # Check if the 'year_of_production' matches
+                        if product["title"] == title or product["original_title"] == title:
+                            print(f"Found media: {product['title']} ({product['year_of_production']})")
+                            print(f"Release Date: {product.get('release_date', 'Unknown')}")
+                            print(f"Universe: {product.get('universe', 'Unknown')}")
+                            picture = product["medias"].get("picture", "No picture available")
+                            print(f"Picture: {picture}")
+                            return product
+            print(f"No media found for '{title}' in SensCritique")
+            return None
+
+    async def fetch_episode(self, title, year):
+        try:
+            # Step 1: Extract episode info
+            episode_info = self.get_episode_info_from_title(title, year)
+            if not episode_info:
+                raise ValueError("Could not parse episode information from the title.")
+
+            tv_show_name = episode_info["tv_show_name"]
+            season_number = episode_info["season_number"]
+            episode_number = episode_info["episode_number"]
+
+            print(f"Searching for TV show: {tv_show_name}, Season: {season_number}, Episode: {episode_number}")
+
+            # Step 2: Fetch the TV show (type 4 indicates TV show in your system)
+            tv_show = await self.fetch_media_tvShow_or_movie_by_name(tv_show_name, 4)
+            if not tv_show:
+                raise ValueError(f"TV show '{tv_show_name}' not found.")
+
+            tv_show_id = tv_show["id"]  # Extract TV show ID
+            print(f"Found TV show '{tv_show_name}' with ID: {tv_show_id}")
+
+            # Step 3: GraphQL query for seasons and episodes
+            query = """
+            query FetchTvShowWithEpisodes($id: Int!) {
+            product(id: $id) {
+                id
+                title
+                seasons {
+                id
+                seasonNumber
+                episodes {
+                    id
+                    episodeNumber
+                    title
+                }
+                }
+            }
+            }
+            """
+
+            # Step 4: Set the query variables
+            variables = {
+                "id": tv_show_id
+            }
+
+            # Step 5: Send the query request
+            response = await self.client.request(query, variables, use_apollo=True)
+
+            # Step 6: Process the response
+            if not response or response.get("errors"):
+                raise ValueError(f"Error fetching TV show details: {response.get('errors')}")
+
+            seasons = response.get("data", {}).get("product", {}).get("seasons", [])
+
+            # Step 7: Find the correct episode
+            for season in seasons:
+                if season["seasonNumber"] == season_number:
+                    for episode in season["episodes"]:
+                        if episode["episodeNumber"] == episode_number:
+                            print(f"Found Episode: {episode['title']} (ID: {episode['id']})")
+                            return {
+                                "id": episode["id"],
+                                "title": episode["title"],
+                                "season": season_number,
+                                "episode": episode_number,
+                                "year_of_production":  tv_show["year_of_production"]
+                            }
+
+            print("Episode not found.")
+            return None
+
+        except Exception as e:
+            print(f"Error in fetch_episode: {e}")
+            return None
+
+    async def fetch_season(self, title, year):
+        """
+        Fetches a specific season from SensCritique based on title and year.
+
+        Args:
+            title (str): Structured title, e.g., "Happy Tree Friends - Season 1" or "Monster (2022) - The Jeffrey Dahmer Story".
+            year (str): Year of the TV show.
+
+        Returns:
+            dict: Information about the matched season, including its ID.
+        """
+        try:
+            # Step 1: Extract TV show name and season title/number
+            tv_show_name, season_number, season_title = self._extract_season_info(title)
+            print(f"Extracted TV Show Name: '{tv_show_name}', Season Number: '{season_number}', Season Title: '{season_title}'")
+
+            # Step 2: Fetch the TV show
+            tv_show = await self.fetch_media_tvShow_or_movie_by_name(tv_show_name, 4)
+            if not tv_show:
+                raise ValueError(f"TV show '{tv_show_name}' not found.")
+
+            tv_show_id = tv_show["id"]  # Extract TV show ID
+            print(f"Found TV show '{tv_show_name}' with ID: {tv_show_id}")
+
+            # Step 3: GraphQL query for seasons
+            query = """
+            query FetchTvShowSeasons($id: Int!) {
+                product(id: $id) {
+                    id
+                    title
+                    seasons {
+                        id
+                        seasonNumber
+                        title
+                    }
+                }
+            }
+            """
+
+            # Step 4: Set query variables
+            variables = {"id": tv_show_id}
+
+            # Step 5: Send the query request
+            response = await self.client.request(query, variables, use_apollo=True)
+
+            # Step 6: Process the response
+            if not response or response.get("errors"):
+                raise ValueError(f"Error fetching TV show seasons: {response.get('errors')}")
+
+            seasons = response.get("data", {}).get("product", {}).get("seasons", [])
+
+            # Step 7: Match the season by number or title
+            for season in seasons:
+                if season_number and season.get("seasonNumber") == season_number:
+                    print(f"Found Season: {season['title']} (ID: {season['id']})")
+                    return {
+                        "id": season["id"],
+                        "title": season["title"],
+                        "season": season_number,
+                        "year_of_production": tv_show["year_of_production"]
+                    }
+                elif season_title and season.get("title") == season_title:
+                    print(f"Found Season by Title: {season['title']} (ID: {season['id']})")
+                    return {
+                        "id": season["id"],
+                        "title": season["title"],
+                        "season": season.get("seasonNumber"),
+                        "year_of_production": tv_show["year_of_production"]
+                    }
+
+            print("Season not found.")
+            return None
+
+        except Exception as e:
+            print(f"Error in fetch_season: {e}")
+            return None
+
+    # Helper function to extract season info
+    def _extract_season_info(self, title):
+        """
+        Extract the TV show name, season number, and season title from the input title.
+
+        Args:
+            title (str): Input title, e.g., 
+                        "Happy Tree Friends - Season 1",
+                        "Happy Tree Friends - S02",
+                        "Happy Tree Friends - Temporada 2",
+                        "Happy Tree Friends - Saison 2".
+
+        Returns:
+            tuple: (tv_show_name, season_number, season_title)
+        """
+        try:
+            # Step 1: Regex to match various season formats
+            pattern = r"^(.*?)\s-\s(?:Season|Saison|Temporada|S)(?:\s?)(\d{1,2})\b"
+            match = re.match(pattern, title, re.IGNORECASE)
+
+            if match:
+                tv_show_name = match.group(1).strip()  # Extract TV show name
+                season_number = int(match.group(2))    # Extract season number
+                return tv_show_name, season_number, None
+
+            # Step 2: Fallback - Split the title by the first hyphen
+            parts = title.split(" - ", 1)
+            tv_show_name = parts[0].strip()
+            season_title = parts[1].strip() if len(parts) > 1 else None
+            return tv_show_name, None, season_title
+
+        except Exception as e:
+            print(f"Error extracting season info: {e}")
+            return None, None, None        
+
+    def get_episode_info_from_title(self, title, year):
+        """
+        Extract the TV show name, season number, and episode number from the structured title.
+
+        Args:
+            title (str): A structured title string, e.g., "Happy Tree Friends - S02E13 - I Get a Trick Out of You (2003)".
+            year (str): The year of the episode.
+
+        Returns:
+            dict: A dictionary with the TV show name, season number, and episode number.
+        """
+        try:
+            # Regular expression to match the format
+            pattern = r"^(.*?)\s-\sS(\d{2})E(\d{2})\s-"
+
+            # Match the pattern
+            match = re.match(pattern, title)
+
+            if match:
+                tv_show_name = match.group(1).strip()  # Group 1: TV show name
+                season_number = int(match.group(2))    # Group 2: Season number as int
+                episode_number = int(match.group(3))   # Group 3: Episode number as int
+
+                # Debugging output (optional)
+                print(f"TV Show Name: {tv_show_name}")
+                print(f"Season Number: {season_number}")
+                print(f"Episode Number: {episode_number}")
+
+                # Return extracted information
+                return {
+                    "tv_show_name": tv_show_name,
+                    "season_number": season_number,
+                    "episode_number": episode_number,
+                    "year": year
+                }
+            else:
+                raise ValueError("Title format is invalid. Expected format: 'TV Show - SxxExx - Episode Title (Year)'")
+
+        except Exception as e:
+            print(f"Error parsing title: {e}")
+            return None
+        
+        
 
     async def add_media_to_wishlist(self, media_id):
             """Add a media item to the SensCritique wishlist."""
@@ -486,7 +778,11 @@ class SensCritiqueClient:
         Returns:
             None
         """
-        media = await self.fetch_media(title, year, self.get_sc_media_type_from_plex_type(content_type))
+        
+        sc_media_type = self.get_sc_media_type_id_from_plex_text_type(content_type)
+        
+        
+        media = await self.fetch_media(title, year, sc_media_type)
 
         if media:
             print(f"Found media match in SensCritique: {media['title']} ({media['year_of_production']})")
@@ -506,7 +802,7 @@ class SensCritiqueClient:
         media_type = media_type_mapping.get(mediaTypeid, None)
         return media_type
 
-    def get_sc_media_type_from_plex_type(self, mediaTypeid):
+    def get_sc_media_type_id_from_plex_text_type(self, mediaTypeid):
         media_type_mapping = {
             "movie": 1,
             "show": 4,
@@ -521,7 +817,7 @@ class SensCritiqueClient:
     def get_sc_text_media_type_from_sc_id(self, mediaTypeid):
         media_type_mapping = {
             1: "movie",
-            4: "show",
+            4: "tvShow",
             5: "season",
             32: "episode"
         }

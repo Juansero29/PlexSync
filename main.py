@@ -31,7 +31,7 @@ async def add_all_plex_watchlist_to_sc():
             print(f"\nSearching for {title} ({year}) on SensCritique...")
 
             # Fetch the media ID from SensCritique
-            media_id = await sc_client.fetch_media_id(title, year, universe=content_type)
+            media_id = await sc_client.fetch_media_id(title, year, sc_client.get_sc_media_type_id_from_plex_text_type(content_type))
 
             if media_id:
                 print(f"Adding {title} ({year}) to SensCritique wishlist...")
@@ -93,7 +93,7 @@ async def remove_plex_watchlist_removed_items_in_sc():
         print(f"Found {len(items_to_remove_from_sc)} items to remove from SensCritique Wishlist.")
         for plex_media in items_to_remove_from_sc:
             # Search the media on SensCritique by title, year, and type (universe)
-            media_id = await sc_client.fetch_media_id(plex_media[0], plex_media[1], universe=plex_media[2])
+            media_id = await sc_client.fetch_media_id(plex_media[0], plex_media[1], sc_client.get_sc_media_type_id_from_plex_text_type(plex_media[2]))
             if media_id:
                 print(f"Removing {plex_media[0]} ({plex_media[1]}) from SensCritique Wishlist...")
                 await sc_client.remove_media_from_wishlist(media_id)
@@ -334,6 +334,8 @@ async def main():
     # await sync_watchlists()
     # await sc_client.rate_media_with_id(85619210, 6)
     await sync_ratings()
+    
+    # season = await sc_client.fetch_season("Happy Tree Friends - S02", 2002)
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function

@@ -19,7 +19,6 @@ class PlexClient:
         self.account = MyPlexAccount(PLEX_USERNAME, token=PLEX_TOKEN)
         self.plex = PlexServer(PLEX_SERVER_ADDRESS, PLEX_TOKEN)
         self.useruuid = None
-
   
     def add_to_plex_watchlist(self, plex_media):
         """Add a movie or TV show to the Plex watchlist using its media object."""
@@ -205,8 +204,6 @@ class PlexClient:
 
             return rated_media
     
-
-                    
     def rate_media_with_ratingKey(self, media, rating):
         """Rate a media product"""
         if media:
@@ -316,7 +313,6 @@ class PlexClient:
             print(f"Error searching for media: {e}")
             return None
 
-
     def rate_media(self, ratingKey, rating):
         """
         Rate a globally searched media item using its metadata ID.
@@ -385,7 +381,6 @@ class PlexClient:
 
         else:
             print(f"No results found for {title} ({year}) [{content_type}]")
-
     
     def get_user_id_by_username(self, username):
         """
