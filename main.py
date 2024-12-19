@@ -187,6 +187,20 @@ def find_sync_entry(sync_data, plex_id=None, sc_id=None):
             return entry
     return None
 
+
+async def print_plex_user_rated_content():
+    rated_media = plex_client.get_user_rated_content()
+    print(f"All media rated in Plex ({len(rated_media)} items):")
+    for media in rated_media:
+        print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}] - Rate Date: {media['ratedDate']}")
+        
+async def print_sens_critique_user_rated_content():
+    rated_media = await sc_client.get_user_rated_media()
+    print(f"All media rated in SensCritique ({len(rated_media)} items):")
+    for media in rated_media:
+        print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}] - Rate Date: {media['ratedDate']}")
+
+
 async def sync_watchlists():
     """Sync both Plex and SensCritique Watchlists."""
     print("Syncing Plex and SensCritique Watchlists...")
@@ -276,19 +290,8 @@ async def sync_watchlists():
 
     print("Watchlist synchronization complete.")
 
-async def print_plex_user_rated_content():
-    rated_media = plex_client.get_user_rated_content()
-    print(f"All media rated in Plex ({len(rated_media)} items):")
-    for media in rated_media:
-        print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}] - Rate Date: {media['ratedDate']}")
-        
-async def print_sens_critique_user_rated_content():
-    rated_media = await sc_client.get_user_rated_media()
-    print(f"All media rated in SensCritique ({len(rated_media)} items):")
-    for media in rated_media:
-        print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}] - Rate Date: {media['ratedDate']}")
 
-async def sync_ratings():
+async def sync_ratings(sensCritiqueToPlex=False):
     # Step 1: Retrieve rated items from Plex and SensCritique
     plex_rated_items = plex_client.get_user_rated_content()
     sens_critique_rated_items = await sc_client.get_user_rated_media()
@@ -316,6 +319,9 @@ async def sync_ratings():
         for item in plex_rated_items
     }
 
+    if(not sensCritiqueToPlex):
+        return
+    
     # Step 5: Sync SensCritique ratings to Plex
     for item in sens_critique_rated_items:
         key = (item["title"].lower(), item["year"])
@@ -331,11 +337,10 @@ async def sync_ratings():
     print("Ratings synchronization completed.")
 
 async def main():
-    # await sync_watchlists()
-    # await sc_client.rate_media_with_id(85619210, 6)
+    
+    await sync_watchlists()
     await sync_ratings()
     
-    # season = await sc_client.fetch_season("Happy Tree Friends - S02", 2002)
 
 if __name__ == "__main__":
     asyncio.run(main())  # This will run the async main function
