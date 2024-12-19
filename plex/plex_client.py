@@ -68,7 +68,7 @@ class PlexClient:
         except Exception as e:
             print(f"Error removing media with Plex ID {plex_media.guid} from watchlist: {e}")
             
-    def get_user_rated_content(self):
+    def get_user_rated_content(self, frenchTitles=True):
             """Retrieve all films, series, seasons, and episodes with ratings from Plex Discover."""
             rated_media = []
             end_cursor = None  # To manage pagination
@@ -77,6 +77,7 @@ class PlexClient:
                 "Host": "community.plex.tv",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
+                "X-Plex-Language": "fr",
                 "X-Plex-Token": PLEX_TOKEN
             }
 
@@ -104,6 +105,7 @@ class PlexClient:
                     date
                     rating
                     metadataItem {
+                        id
                         title
                         type
                         year
@@ -169,12 +171,17 @@ class PlexClient:
                         rating = node.get("rating")
                         ratedDate = node.get("date")
                         if metadata and rating:
+                            id = metadata.get("id")
                             item_type = metadata.get("type")  # EPISODE, SEASON, SHOW, MOVIE
-                            title = metadata.get("title")
+                            
+                            if frenchTitles:
+                                french_title = self.get_french_title(id)
+                            
+                            title = french_title if french_title else metadata.get("title")
+                            
                             year = metadata.get("year")
-                            key = metadata.get("key")
                             item = {
-                                "id": key,
+                                "id": id,
                                 "title": title,
                                 "type": item_type,
                                 "year": year,
@@ -204,7 +211,32 @@ class PlexClient:
 
             return rated_media
     
+    def get_french_title(self, id):
+        headers = {
+                "Accept": "application/json",
+                "Host": "discover.provider.plex.tv",
+                "X-Plex-Language": "fr",
+                "X-Plex-Token": PLEX_TOKEN
+            }
+        
+        url = f"https://discover.provider.plex.tv/library/metadata/{id}"
+        
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            metadata = data.get("MediaContainer", {}).get("Metadata", {})
+            
+            if metadata:
+                french_title = metadata[0].get("title", {})
+                
+                return french_title
+                
+                
+        
+    
     def rate_media_with_ratingKey(self, media, rating):
+        
         """Rate a media product"""
         if media:
             print(f"Media found: {media.title} ({media.year}) with rating {media.ratingKey}")

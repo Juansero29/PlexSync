@@ -338,7 +338,7 @@ async def sync_ratings(sensCritiqueToPlex=False):
 
 async def main():
     
-    await sync_watchlists()
+    # await sync_watchlists()
     await sync_ratings()
     
 

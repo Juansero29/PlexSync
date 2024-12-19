@@ -182,7 +182,7 @@ class SensCritiqueClient:
                         continue
                     
                     # Check if the 'year_of_production' matches
-                    if product["year_of_production"] == year or str(year) in product["title"]:
+                    if product["year_of_production"] == year or str(year) in product["title"] or ((product["year_of_production"] == year-1 and title == product["title"]) or (product["year_of_production"] == year+1 and title == product["title"])):
                         print(f"Found media: {product['title']} ({product['year_of_production']})")
                         print(f"Release Date: {product.get('release_date', 'Unknown')}")
                         print(f"Universe: {product.get('universe', 'Unknown')}")
@@ -785,7 +785,7 @@ class SensCritiqueClient:
         media = await self.fetch_media(title, year, sc_media_type)
 
         if media:
-            print(f"Found media match in SensCritique: {media['title']} ({media['year_of_production']})")
+            print(f"Found media match in SensCritique: {media['title']} ({media['year_of_production']}) [{content_type}]")
             await self.rate_media_with_id(media['id'], rating)
         else:
                 print(f"No results found for {title} ({year}) [{content_type}].")
