@@ -45,6 +45,10 @@ class PlexClient:
                 for item in watchlist:
                     # Fetch user state (this will include the date when the item was added to the watchlist)
                     user_state = self.account.userState(item)
+                    
+                    
+                    item.frenchTitle = self.get_french_title(item.key, idIsKey=True)
+                    
                     item.added_at = user_state.watchlistedAt if user_state.watchlistedAt else "Unknown"
                     
                     print(f"- {item.title} ({item.year}) Added to Watchlist at {item.added_at}")
@@ -211,7 +215,7 @@ class PlexClient:
 
             return rated_media
     
-    def get_french_title(self, id):
+    def get_french_title(self, id, idIsKey=False):
         headers = {
                 "Accept": "application/json",
                 "Host": "discover.provider.plex.tv",
@@ -219,7 +223,10 @@ class PlexClient:
                 "X-Plex-Token": PLEX_TOKEN
             }
         
-        url = f"https://discover.provider.plex.tv/library/metadata/{id}"
+        if idIsKey:
+            url = f"https://discover.provider.plex.tv{id}"
+        else:
+            url = f"https://discover.provider.plex.tv/library/metadata/{id}"
         
         response = requests.get(url, headers=headers)
         

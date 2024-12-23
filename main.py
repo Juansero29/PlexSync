@@ -200,7 +200,6 @@ async def print_sens_critique_user_rated_content():
     for media in rated_media:
         print(f"[{media['type']}] {media['title']} ({media['year']}): {media['rating']} [{media['id']}] - Rate Date: {media['ratedDate']}")
 
-
 async def sync_watchlists():
     """Sync both Plex and SensCritique Watchlists."""
     print("Syncing Plex and SensCritique Watchlists...")
@@ -271,9 +270,9 @@ async def sync_watchlists():
                 entry["status"] = "removed_from_sc"
 
             # If it's missing from SensCritique, remove it from Plex (because it was removed from SensCritique)
-            elif not sc_wishlist or not any(s["title"] == title and s["release_date"].year == year and s["universe"] == media_type for s in sc_wishlist):
+            elif not sc_wishlist or not any((s["title"] == title or s["original_title"] == title) and s["release_date"].year == year and s["universe"] == media_type for s in sc_wishlist):
                 print(f"Removing '{title}' ({year}) from Plex watchlist... (SensCritique removed it)")
-                plex_media = plex_client.search_media_in_discover(title, year, content_type=media_type)
+                plex_media = plex_client.search_media_in_plex(title, year, content_type=media_type)
                 if plex_media:
                     plex_client.remove_from_plex_watchlist(plex_media)
                 # Update the sync status
@@ -290,8 +289,10 @@ async def sync_watchlists():
 
     print("Watchlist synchronization complete.")
 
-
 async def sync_ratings(sensCritiqueToPlex=False):
+    
+    print("Ratings synchronization started.")
+    
     # Step 1: Retrieve rated items from Plex and SensCritique
     plex_rated_items = plex_client.get_user_rated_content()
     sens_critique_rated_items = await sc_client.get_user_rated_media()
@@ -306,6 +307,10 @@ async def sync_ratings(sensCritiqueToPlex=False):
     for item in plex_rated_items:
         key = (item["title"].lower(), item["year"])
         if key not in sc_rated_set or sc_rated_set[key] != item["rating"]:
+            
+            if item["type"].lower() == 'episode':
+                continue
+            
             print(f"Rating '{item['title']}' ({item['year']}) in SensCritique with {item['rating']} stars.")
             await sc_client.search_and_rate_media(
                 item["title"], item["year"], item["type"].lower(), item["rating"]

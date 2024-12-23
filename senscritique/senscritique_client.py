@@ -66,6 +66,7 @@ class SensCritiqueClient:
                     id
                     title
                     year_of_production
+                    original_title
                     genres
                     release_date
                     universe
@@ -92,6 +93,7 @@ class SensCritiqueClient:
                 # Loop through the user's wishes and format the data
                 for wish in user["wishes"]:
                     title = wish.get("title", "Unknown Title")
+                    original_title = wish.get("original_title", "Unknown Original Title")
                     year = wish.get("year_of_production", "Unknown Year")
                     genres = ", ".join(wish.get("genres", []))
                     id = wish.get("id", "Unknown ID")
@@ -109,6 +111,7 @@ class SensCritiqueClient:
                         "id": id,
                         "date_wishlisted": date_wishlisted,
                         "title": title,
+                        "original_title": original_title,
                         "year": year,
                         "genres": genres,
                         "release_date": release_date,
@@ -134,6 +137,10 @@ class SensCritiqueClient:
             return None
     
     async def fetch_media(self, title, year, universe):
+        
+        if isinstance(universe, str):
+            universe = self.get_sc_media_type_id_from_plex_text_type(universe)
+        
         if universe == 1 or universe == 4:
             return await self.fetch_media_tvShow_or_movie(title, year, universe)
         if universe == 32:
