@@ -73,148 +73,215 @@ class PlexClient:
             print(f"Error removing media with Plex ID {plex_media.guid} from watchlist: {e}")
             
     def get_user_rated_content(self, frenchTitles=True):
-            """Retrieve all films, series, seasons, and episodes with ratings from Plex Discover."""
-            rated_media = []
-            end_cursor = None  # To manage pagination
+        """Retrieve all films, series, seasons, and episodes with ratings from Plex Discover."""
+        rated_media = []
+        end_cursor = None  # To manage pagination
 
-            headers = {
-                "Host": "community.plex.tv",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "X-Plex-Language": "fr",
-                "X-Plex-Token": PLEX_TOKEN
+        headers = {
+            "Host": "community.plex.tv",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Plex-Language": "fr",
+            "X-Plex-Token": PLEX_TOKEN
+        }
+
+        graphql_query = """
+        query GetReviewsHub($uuid: ID = "", $first: PaginationInt!, $after: String) {
+        user(id: $uuid) {
+            reviews(first: $first, after: $after) {
+            nodes {
+                ... on ActivityRating {
+                ...ActivityRatingFragment
+                }
+                ... on ActivityWatchRating {
+                ...ActivityWatchRatingFragment
+                }
+                ... on ActivityReview {
+                ...ActivityReviewFragment
+                }
+                ... on ActivityWatchReview {
+                ...ActivityWatchReviewFragment
+                }
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            }
+        }
+        }
+
+        fragment ActivityRatingFragment on ActivityRating {
+        id
+        date
+        rating
+        metadataItem {
+            id
+            title
+            type
+            year
+            index
+            key
+            parent {
+            title
+            year
+            index
+            }
+            grandparent {
+            title
+            year
+            index
+            }
+        }
+        }
+
+        fragment ActivityWatchRatingFragment on ActivityWatchRating {
+        id
+        date
+        rating
+        metadataItem {
+            title
+            type
+            year
+            index
+            key
+            parent {
+            title
+            year
+            index
+            }
+            grandparent {
+            title
+            year
+            index
+            }
+        }
+        }
+
+        fragment ActivityReviewFragment on ActivityReview {
+        id
+        date
+        reviewRating: rating
+        message
+        hasSpoilers
+        metadataItem {
+            id
+            title
+            type
+            year
+            index
+            key
+            parent {
+            title
+            year
+            index
+            }
+            grandparent {
+            title
+            year
+            index
+            }
+        }
+        }
+
+        fragment ActivityWatchReviewFragment on ActivityWatchReview {
+        id
+        date
+        reviewRating: rating
+        message
+        hasSpoilers
+        metadataItem {
+            id
+            title
+            type
+            year
+            index
+            key
+            parent {
+            title
+            year
+            index
+            }
+            grandparent {
+            title
+            year
+            index
+            }
+        }
+        }
+        """
+
+        user_uuid = self.get_user_id_by_username(PLEX_USERNAME)
+
+        while True:
+            payload = {
+                "query": graphql_query,
+                "variables": {
+                    "uuid": user_uuid,
+                    "first": 100,
+                    "after": end_cursor
+                },
+                "operationName": "GetReviewsHub"
             }
 
-            graphql_query = """
-                    query GetReviewsHub($uuid: ID = "", $first: PaginationInt!, $after: String) {
-                    user(id: $uuid) {
-                        reviews(first: $first, after: $after) {
-                        nodes {
-                            ... on ActivityRating {
-                            ...ActivityRatingFragment
-                            }
-                            ... on ActivityWatchRating {
-                            ...ActivityWatchRatingFragment
-                            }
-                        }
-                        pageInfo {
-                            hasNextPage
-                            endCursor
-                        }
-                        }
-                    }
-                    }
-                    fragment ActivityRatingFragment on ActivityRating {
-                    id
-                    date
-                    rating
-                    metadataItem {
-                        id
-                        title
-                        type
-                        year
-                        index
-                        key
-                        parent {
-                        title
-                        index
-                        }
-                        grandparent {
-                        title
-                        index
-                        }
-                    }
-                    }
-                    fragment ActivityWatchRatingFragment on ActivityWatchRating {
-                    id
-                    date
-                    rating
-                    metadataItem {
-                        title
-                        type
-                        year
-                        index
-                        key
-                        parent {
-                        title
-                        index
-                        }
-                        grandparent {
-                        title
-                        index
-                        }
-                    }
-                    }
-                    """
-            
-            user_uuid = self.get_user_id_by_username(PLEX_USERNAME)
-            
-            while True:
-                payload = {
-                    "query": graphql_query,
-                    "variables": {
-                        "uuid": user_uuid,
-                        "first": 100, 
-                        "after": end_cursor
-                    },
-                    "operationName": "GetReviewsHub"
-                }
+            response = requests.post("https://community.plex.tv/api", headers=headers, json=payload)
 
-                response = requests.post("https://community.plex.tv/api", headers=headers, json=payload)
+            if response.status_code == 200:
+                data = response.json()
+                nodes = data.get("data", {}).get("user", {}).get("reviews", {}).get("nodes", [])
+                page_info = data.get("data", {}).get("user", {}).get("reviews", {}).get("pageInfo", {})
+                end_cursor = page_info.get("endCursor")
+                has_next_page = page_info.get("hasNextPage")
 
-                if response.status_code == 200:
-                    data = response.json()
-                    nodes = data.get("data", {}).get("user", {}).get("reviews", {}).get("nodes", [])
-                    page_info = data.get("data", {}).get("user", {}).get("reviews", {}).get("pageInfo", {})
-                    end_cursor = page_info.get("endCursor")
-                    has_next_page = page_info.get("hasNextPage")
+                for node in nodes:
+                    metadata = node.get("metadataItem", {})
+                    rating = node.get("rating") or node.get("reviewRating")
+                    reviewText = node.get("message", "").strip()
+                    reviewHasSpoilers = node.get("hasSpoilers", False)
+                    ratedDate = node.get("date")
 
-                    # Parse nodes
-                    for node in nodes:
-                        metadata = node.get("metadataItem", {})
-                        rating = node.get("rating")
-                        ratedDate = node.get("date")
-                        if metadata and rating:
-                            id = metadata.get("id")
-                            item_type = metadata.get("type")  # EPISODE, SEASON, SHOW, MOVIE
-                            
-                            if frenchTitles:
-                                french_title = self.get_french_title(id)
-                            
-                            title = french_title if french_title else metadata.get("title")
-                            
-                            year = metadata.get("year")
-                            item = {
-                                "id": id,
-                                "title": title,
-                                "type": item_type,
-                                "year": year,
-                                "rating": rating,
-                                "ratedDate": ratedDate
-                            }
+                    if metadata and rating:
+                        id = metadata.get("id")
+                        item_type = metadata.get("type")
 
-                            # Handle specific formatting for episodes and seasons
-                            if item_type == "EPISODE":
-                                parent = metadata.get("parent", {})
-                                grandparent = metadata.get("grandparent", {})
-                                season = parent.get("index")
-                                episode = metadata.get("index")
-                                item["title"] = f"{grandparent.get('title', 'Unknown Show')} - S{str(season).zfill(2)}E{str(episode).zfill(2)} - {title}"
-                            elif item_type == "SEASON":
-                                parent = metadata.get("parent", {})
-                                item["title"] = f"{parent.get('title', 'Unknown Show')} - Season {metadata.get('index')}"
+                        french_title = self.get_french_title(id) if frenchTitles else None
+                        title = french_title if french_title else metadata.get("title")
 
-                            rated_media.append(item)
+                        year = metadata.get("year")
+                        item = {
+                            "id": id,
+                            "title": title,
+                            "type": item_type,
+                            "year": year,
+                            "rating": rating,
+                            "ratedDate": ratedDate
+                        }
 
-                    # Break the loop if no more pages
-                    if not has_next_page:
-                        break
-                else:
-                    print(f"Failed to fetch rated content. Status: {response.status_code}, Response: {response.text}")
+                        if reviewText:
+                            item["reviewText"] = reviewText
+                            item["reviewHasSpoilers"] = reviewHasSpoilers
+
+                        if item_type == "EPISODE":
+                            parent = metadata.get("parent", {})
+                            grandparent = metadata.get("grandparent", {})
+                            season = parent.get("index")
+                            episode = metadata.get("index")
+                            item["tvShowYear"] = grandparent.get("year")
+                            item["title"] = f"{grandparent.get('title', 'Unknown Show')} - S{str(season).zfill(2)}E{str(episode).zfill(2)} - {title}"
+                        elif item_type == "SEASON":
+                            parent = metadata.get("parent", {})
+                            item["title"] = f"{parent.get('title', 'Unknown Show')} - Season {metadata.get('index')}"
+
+                        rated_media.append(item)
+
+                if not has_next_page:
                     break
+            else:
+                print(f"Failed to fetch rated content. Status: {response.status_code}, Response: {response.text}")
+                break
 
-            return rated_media
-    
+        return rated_media
+
     def get_french_title(self, id, idIsKey=False):
         headers = {
                 "Accept": "application/json",
@@ -396,7 +463,7 @@ class PlexClient:
             print(f"Error rating global media: {e}")
             return False
 
-    def search_and_rate_media(self, title, year, content_type, rating):
+    def search_and_rate_media(self, title, year, content_type, rating, reviewText=None, reviewHasSpoilers=None):
         """
         Search for media locally and globally, then rate it.
 

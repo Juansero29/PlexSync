@@ -308,12 +308,14 @@ async def sync_ratings(sensCritiqueToPlex=False):
         key = (item["title"].lower(), item["year"])
         if key not in sc_rated_set or sc_rated_set[key] != item["rating"]:
             
-            if item["type"].lower() == 'episode':
-                continue
-            
             print(f"Rating '{item['title']}' ({item['year']}) in SensCritique with {item['rating']} stars.")
             await sc_client.search_and_rate_media(
-                item["title"], item["year"], item["type"].lower(), item["rating"]
+                item["title"],
+                item.get("tvShowYear") or item.get("year"),
+                item["type"].lower(),
+                item["rating"],
+                item.get("reviewText"),
+                item.get("reviewHasSpoilers")
             )
         else:
             print(f"Item {item['title']} ({item['year']}) already rated in SensCritique")
@@ -333,7 +335,7 @@ async def sync_ratings(sensCritiqueToPlex=False):
         if key not in plex_rated_set or plex_rated_set[key] != item["rating"]:
             print(f"Rating '{item['title']}' ({item['year']}) in Plex with {item['rating']} stars.")
             plex_client.search_and_rate_media(
-                item["title"], item["year"], item["type"], item["rating"]
+                item["title"], item["year"], item["type"], item["rating"], item["reviewText"], item["reviewHasSpoilers"]
             )
         else:
             print(f"Item {item['title']} ({item['year']}) already rated in Plex")

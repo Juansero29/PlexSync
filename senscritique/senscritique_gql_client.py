@@ -72,6 +72,8 @@ class SensCritiqueGqlClient(Client):
         if response.status_code == 200:
             data = response.json()
             cookie_ref = data["data"]["signInWithEmailAndPassword"]["userCookie"]["cookieRef"]
+            print(f"Signed user {self.email} successfully with SensCritique API!")
+            
             return cookie_ref
         else:
             raise Exception(f"Failed to sign in: {response.status_code} - {response.text}")

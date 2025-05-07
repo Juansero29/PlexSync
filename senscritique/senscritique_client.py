@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 from plex.plex_client import PlexClient
 import json
 import re
+import requests
+
+
 # Load environment variables
 load_dotenv()
 
@@ -730,7 +733,7 @@ class SensCritiqueClient:
             else:
                 raise Exception("Failed to rate the media. Response data is missing or malformed.")
 
-    async def search_and_rate_media(self, title, year, content_type, rating):
+    async def search_and_rate_media(self, title, year, content_type, rating, reviewText=None, reviewHasSpoilers=None):
         """
         Search for media locally and globally, then rate it.
 
@@ -752,8 +755,94 @@ class SensCritiqueClient:
         if media:
             print(f"Rating media matched in SensCritique: {media['title']} ({media['year_of_production']}) [{content_type}]")
             await self.rate_media_with_id(media['id'], rating)
+                        
+            # if reviewText:
+                # self.publish_sc_text_review(media['id'], reviewText, reviewHasSpoilers)
+            
         else:
                 print(f"Impossible to rate in SensCritique. No results found for {title} ({year}) [{content_type}].")
+
+
+    def publish_sc_text_review(self, productId, reviewText, reviewHasSpoilers):
+        """
+        Publishes a review to SensCritique using FlareSolverr to bypass Cloudflare.
+
+        Args:
+            productId (int): SensCritique product ID
+            reviewText (str): Text of the review
+            reviewHasSpoilers (bool): Whether the review contains spoilers
+
+        Returns:
+            None
+        """
+
+        flaresolverr_url = "http://localhost:8191/v1"
+        target_url = "https://apollo.senscritique.com/"
+
+        # Format spoiler content
+        if reviewHasSpoilers:
+            html = f"<spoiler><p>{reviewText}</p></spoiler>"
+            markdown = f">!{reviewText}!<"
+            title_text = f"Critique de {SC_USERNAME} (SPOILERS)"
+        else:
+            html = f"<p>{reviewText}</p>"
+            markdown = reviewText
+            title_text = f"Critique de {SC_USERNAME}"
+
+        graphql_payload = {
+            "operationName": "ReviewCreateOrEdit",
+            "variables": {
+                "commentPrivacy": "EVERYONE",
+                "html": html,
+                "isPublished": 1,
+                "markdown": markdown,
+                "productId": productId,
+                "title": title_text
+            },
+            "query": """
+                mutation ReviewCreateOrEdit($commentPrivacy: CommentPrivacy, $gameSystemId: Int, $html: String, $isPublished: Int, $markdown: String!, $productId: Int!, $title: String) {
+                reviewCreateOrEdit(
+                    commentPrivacy: $commentPrivacy
+                    gameSystemId: $gameSystemId
+                    html: $html
+                    isPublished: $isPublished
+                    markdown: $markdown
+                    productId: $productId
+                    title: $title
+                ) {
+                    id
+                    title
+                    url
+                }
+                }
+            """
+        }
+
+        flaresolverr_payload = {
+            "cmd": "request.post",
+            "url": target_url,
+            "postData": json.dumps(graphql_payload),
+            "maxTimeout": 60000
+        }
+
+        response = requests.post(flaresolverr_url, json=flaresolverr_payload)
+
+        if response.status_code == 200:
+            try:
+                raw_response = response.json().get("solution", {}).get("response")
+                if raw_response:
+                    sc_response = json.loads(raw_response)
+                    review = sc_response.get("data", {}).get("reviewCreateOrEdit")
+                    if review:
+                        print(f"✅ Review published: {review.get('title')} -> {review.get('url')}")
+                    else:
+                        print("⚠️ Review creation returned no data.")
+                else:
+                    print("⚠️ No solution response received from FlareSolverr.")
+            except Exception as e:
+                print(f"❌ Failed to parse SC review response: {e}")
+        else:
+            print(f"❌ FlareSolverr error: {response.status_code}, {response.text}")
 
     def get_plex_media_type_from_sc_id(self, mediaTypeid):
         media_type_mapping = {
