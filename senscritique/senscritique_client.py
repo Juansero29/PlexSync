@@ -20,37 +20,37 @@ class SensCritiqueClient:
         self.client = SensCritiqueGqlClient.build(SC_EMAIL, SC_PASSWORD)
         self.userId = SC_USER_ID
 
-    # Function to translate French month to English
     def parse_french_date(self, date_str):
+        """Parse either ISO (YYYY-MM-DD) or French-formatted dates like '21 mars 2024'."""
         
+        # Handle ISO date format directly
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d")
+        except Exception:
+            pass
+
+        # Fallback for French month names
         months_in_french = {
             'janvier': 'January', 'février': 'February', 'mars': 'March', 'avril': 'April', 'mai': 'May',
             'juin': 'June', 'juillet': 'July', 'août': 'August', 'septembre': 'September', 'octobre': 'October',
             'novembre': 'November', 'décembre': 'December'
         }
-        
-        english_date = None
-        
-        for french_month, english_month in months_in_french.items():
-            if french_month in date_str:
-                english_date = date_str.replace(french_month, english_month)
-                break
-                
-        try:
-            parsed_date = datetime.strptime(english_date, "%d %B %Y")
-            return parsed_date
-        except Exception as e:
-            
-            try:
-                parsed_date = datetime.strptime(date_str, "%Y")
-                return parsed_date
-            except Exception as e:
-                try:
-                    parsed_date = datetime.strptime(date_str, "%B %Y")
-                    return parsed_date
-                except Exception as e:
-                    print(f"Failed to parse using strptime for french date {date_str}: {e}")
 
+        english_date = date_str
+        for fr, en in months_in_french.items():
+            if fr in date_str:
+                english_date = date_str.replace(fr, en)
+                break
+
+        # Try parsing English-formatted versions
+        for fmt in ("%d %B %Y", "%Y", "%B %Y"):
+            try:
+                return datetime.strptime(english_date, fmt)
+            except Exception:
+                continue
+
+        print(f"Failed to parse date: {date_str}")
+        return None
 
     async def fetch_user_wishes(self, limit=30):
         """Fetch the wishlist of the authenticated user."""
@@ -150,122 +150,80 @@ class SensCritiqueClient:
             return await self.fetch_season(title, year)
             
     
-    async def fetch_media_tvShow_or_movie(self, title, year, universe): 
-        """Fetch media by title, year, and universe."""
+    async def fetch_media_tvShow_or_movie(self, title, year, universe):
+        """Fetch media by title, year, and universe using SearchAutocomplete."""
         
-        # Updated GraphQL query to fetch additional details like genres, release_date, universe, and picture
         query = """
-        query SearchMedia($keywords: String!, $universe: String) {
-            searchResult(keywords: $keywords, universe: $universe, limit: 50) {
-                results {
-                    products_list {
+        query SearchAutocomplete($keywords: String!, $universe: String, $limit: Int) {
+            searchAutocomplete(keywords: $keywords, universe: $universe, limit: $limit) {
+                total
+                items {
+                    product {
                         id
                         title
-                        year_of_production
-                        genres
-                        release_date
+                        originalTitle
                         universe
-                        medias(pictureSize: "150") {
+                        dateRelease
+                        dateReleaseOriginal
+                        medias {
                             picture
                         }
+                        url
                     }
                 }
             }
         }
         """
-        
-        variables = {"keywords": title, "universe": universe}
+
+        universe_label = self.get_sc_text_media_type_from_sc_id(universe)
+        variables = {
+            "keywords": title,
+            "universe": universe_label,
+            "limit": 20
+        }
+
         response = await self.client.request(query, variables)
 
-        # Ensure we are checking the 'data' key
-        if "data" in response and "searchResult" in response["data"]:
-            results = response["data"]["searchResult"]["results"]
-            for result in results:
-                products_list = result.get("products_list", [])
-                for product in products_list:
-                    
-                    
-                    if product["universe"] != self.get_sc_text_media_type_from_sc_id(universe):
-                        continue
-                    
-                    # Check if the 'year_of_production' matches
-                    if product["year_of_production"] == year or str(year) in product["title"] or ((product["year_of_production"] == year-1 and title == product["title"]) or (product["year_of_production"] == year+1 and title == product["title"])):
-                        print(f"Found media: {product['title']} ({product['year_of_production']})")
-                        print(f"Release Date: {product.get('release_date', 'Unknown')}")
-                        print(f"Universe: {product.get('universe', 'Unknown')}")
-                        picture = product["medias"].get("picture", "No picture available")
-                        print(f"Picture: {picture}")
-                        return product
+        if "data" in response and "searchAutocomplete" in response["data"]:
+            items = response["data"]["searchAutocomplete"]["items"]
+            for item in items:
+                product = item.get("product")
+                if not product:
+                    continue
 
-                    # If year doesn't match, check release_date
-                    release_date = product.get("release_date", None)
+                # Check universe match (as string or int, depending on API)
+                if str(product.get("universe")) != str(universe):
+                    continue
+
+                # Try matching by exact title and year of release
+                product_title = product.get("title", "")
+                product_year = None
+
+                # Parse release year from available date fields
+                for date_field in ("dateRelease", "dateReleaseOriginal"):
+                    release_date = product.get(date_field)
                     if release_date:
                         try:
-                            # Parse the French release date string to datetime object
-                            release_date = self.parse_french_date(release_date)
-                            if release_date and release_date.year == year:
-                                print(f"Found media by release year: {product['title']} ({release_date.year})")
-                                print(f"Genres: {', '.join(product.get('genres', []))}")
-                                print(f"Release Date: {release_date}")
-                                print(f"Universe: {product.get('universe', 'Unknown')}")
-                                picture = product["medias"].get("picture", "No picture available")
-                                print(f"Picture: {picture}")
-                                return product
-                        except ValueError:
-                            print(f"Could not parse release date: {release_date}")
+                            product_year = self.parse_french_date(release_date).year
+                            break
+                        except Exception:
+                            pass
+
+                if product_year:
+                    if (
+                        product_year == year
+                        or str(year) in product_title
+                        or (product_year in {year - 1, year + 1} and product_title == title)
+                    ):
+                        print(f"Found media: {product_title} ({product_year})")
+                        print(f"Universe: {product.get('universe')}")
+                        print(f"URL: {product.get('url')}")
+                        print(f"Picture: {product['medias'].get('picture', 'No picture')}")
+                        product['year_of_production'] = product_year
+                        return product
+
         print(f"No media found for '{title}' ({year}) in SensCritique")
         return None
-
-    async def fetch_media_tvShow_or_movie_by_name(self, title, universe): 
-            """Fetch media by title, year, and universe."""
-            
-            # Updated GraphQL query to fetch additional details like genres, release_date, universe, and picture
-            query = """
-            query SearchMedia($keywords: String!, $universe: String) {
-                searchResult(keywords: $keywords, universe: $universe, limit: 50) {
-                    results {
-                        products_list {
-                            id
-                            title
-                            original_title
-                            year_of_production
-                            genres
-                            release_date
-                            universe
-                            medias(pictureSize: "150") {
-                                picture
-                            }
-                        }
-                    }
-                }
-            }
-            """
-            
-            variables = {"keywords": title, "universe": universe}
-            response = await self.client.request(query, variables)
-
-            # Ensure we are checking the 'data' key
-            if "data" in response and "searchResult" in response["data"]:
-                results = response["data"]["searchResult"]["results"]
-                for result in results:
-                    products_list = result.get("products_list", [])
-                    for product in products_list:
-                        
-                        text_universe = self.get_sc_text_media_type_from_sc_id(universe)
-                        
-                        if product["universe"] != text_universe:
-                            continue
-                        
-                        # Check if the 'year_of_production' matches
-                        if product["title"] == title or product["original_title"] == title:
-                            print(f"Found media: {product['title']} ({product['year_of_production']})")
-                            print(f"Release Date: {product.get('release_date', 'Unknown')}")
-                            print(f"Universe: {product.get('universe', 'Unknown')}")
-                            picture = product["medias"].get("picture", "No picture available")
-                            print(f"Picture: {picture}")
-                            return product
-            print(f"No media found for '{title}' in SensCritique")
-            return None
 
     async def fetch_episode(self, title, year):
         try:
@@ -281,7 +239,7 @@ class SensCritiqueClient:
             print(f"Searching for TV show: {tv_show_name}, Season: {season_number}, Episode: {episode_number}")
 
             # Step 2: Fetch the TV show (type 4 indicates TV show in your system)
-            tv_show = await self.fetch_media_tvShow_or_movie_by_name(tv_show_name, 4)
+            tv_show = await self.fetch_media_tvShow_or_movie(tv_show_name, year, 4)
             if not tv_show:
                 raise ValueError(f"TV show '{tv_show_name}' not found.")
 
@@ -313,7 +271,7 @@ class SensCritiqueClient:
             }
 
             # Step 5: Send the query request
-            response = await self.client.request(query, variables, use_apollo=True)
+            response = await self.client.request(query, variables)
 
             # Step 6: Process the response
             if not response or response.get("errors"):
@@ -359,7 +317,7 @@ class SensCritiqueClient:
             print(f"Extracted TV Show Name: '{tv_show_name}', Season Number: '{season_number}', Season Title: '{season_title}'")
 
             # Step 2: Fetch the TV show
-            tv_show = await self.fetch_media_tvShow_or_movie_by_name(tv_show_name, 4)
+            tv_show = await self.fetch_media_tvShow_or_movie(tv_show_name, year, 4)
             if not tv_show:
                 raise ValueError(f"TV show '{tv_show_name}' not found.")
 
@@ -385,7 +343,7 @@ class SensCritiqueClient:
             variables = {"id": tv_show_id}
 
             # Step 5: Send the query request
-            response = await self.client.request(query, variables, use_apollo=True)
+            response = await self.client.request(query, variables)
 
             # Step 6: Process the response
             if not response or response.get("errors"):
@@ -559,12 +517,12 @@ class SensCritiqueClient:
                 "limit": 5000,
                 "offset": 0,
                 "universe": None,
-                "username": "juansero29",  # Replace with the correct username if needed
+                "username": SC_USERNAME,  # Replace with the correct username if needed
                 "yearDateDone": None
             }
 
             # Send the request using the GraphQL client
-            response = await self.client.request(query, variables, use_apollo=True)
+            response = await self.client.request(query, variables)
             
             # Check the response data
             if "data" in response and "user" in response["data"]:
@@ -593,7 +551,7 @@ class SensCritiqueClient:
             
             
             try:
-                response = await self.client.request(query, variables, use_apollo=True)
+                response = await self.client.request(query, variables)
                 
                 if response and 'data' in response and 'feed' in response['data']:
                     feeds = response['data']['feed'][0]['feeds']
@@ -622,7 +580,7 @@ class SensCritiqueClient:
         }
 
         # Send the request using the GraphQL client
-        response = await self.client.request(query, variables, use_apollo=True)
+        response = await self.client.request(query, variables)
 
         # Initialize a list to store the rated media
         rated_media = []
@@ -745,7 +703,7 @@ class SensCritiqueClient:
             }
 
             # Send the request using your Apollo client
-            response = await self.client.request(query, variables, use_apollo=True)
+            response = await self.client.request(query, variables)
             
             # Process the response to return useful information
             if "data" in response and "productRate" in response["data"]:
@@ -792,10 +750,10 @@ class SensCritiqueClient:
         media = await self.fetch_media(title, year, sc_media_type)
 
         if media:
-            print(f"Found media match in SensCritique: {media['title']} ({media['year_of_production']}) [{content_type}]")
+            print(f"Rating media matched in SensCritique: {media['title']} ({media['year_of_production']}) [{content_type}]")
             await self.rate_media_with_id(media['id'], rating)
         else:
-                print(f"No results found for {title} ({year}) [{content_type}].")
+                print(f"Impossible to rate in SensCritique. No results found for {title} ({year}) [{content_type}].")
 
     def get_plex_media_type_from_sc_id(self, mediaTypeid):
         media_type_mapping = {

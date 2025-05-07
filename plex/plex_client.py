@@ -468,14 +468,14 @@ class PlexClient:
             data = response.json()
             user_data = data.get("data", {}).get("userByUsername")
             if user_data:
-                print(f"User '{username}' found. ID: {user_data['id']}")
+                print(f"Plex User '{username}' found. ID: {user_data['id']}")
                 self.useruuid = user_data["id"]
                 return self.useruuid
             else:
-                print(f"User '{username}' not found.")
+                print(f"Plex User '{username}' not found.")
                 return None
         else:
-            print(f"Failed to fetch user ID. Status: {response.status_code}, Response: {response.text}")
+            print(f"Failed to fetch user ID from Plex. Status: {response.status_code}, Response: {response.text}")
             return None
 
     def get_user_rated_content_in_local_plex_server(self):
